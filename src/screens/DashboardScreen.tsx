@@ -25,7 +25,9 @@ export default function DashboardScreen() {
   const [iconMap, setIconMap]   = useState<Record<string, string>>({});
   const [loading, setLoading]   = useState(true);
   const [selectedCat, setSelectedCat]   = useState<CatRow | null>(null);
-  const [paidExpanded, setPaidExpanded] = useState<Record<string, boolean>>({});
+  const [userPopup, setUserPopup] = useState<{
+    name: string; color: string; bgColor: string; groups: PaidGroup[]; paid: number;
+  } | null>(null);
 
   const load = useCallback(async () => {
     if (!currentHouse) return;
@@ -108,8 +110,6 @@ export default function DashboardScreen() {
     return groups;
   });
 
-  const togglePaid = (key: string) => setPaidExpanded(prev => ({ ...prev, [key]: !prev[key] }));
-
   const houseName = currentHouse?.name ?? 'House';
 
   return (
@@ -167,9 +167,13 @@ export default function DashboardScreen() {
               bgColor={USER_LIGHT[i]}
               totalExpenses={u.share}
               paid={u.paid}
-              paidGroups={paidGroupsByUser[i] ?? []}
-              expanded={!!paidExpanded[u.nickname]}
-              onToggle={() => togglePaid(u.nickname)}
+              onPress={() => setUserPopup({
+                name: u.fullName,
+                color: USER_COLORS[i],
+                bgColor: USER_LIGHT[i],
+                groups: paidGroupsByUser[i] ?? [],
+                paid: u.paid,
+              })}
             />
           ))}
         </View>
@@ -223,18 +227,20 @@ export default function DashboardScreen() {
       />
 
     </ScrollView>
+
+      {/* Paid breakdown popup */}
+      <PaidGroupsPopup data={userPopup} onClose={() => setUserPopup(null)} />
       </View>
     </View>
   );
 }
 
-function PersonCard({ name, color, bgColor, totalExpenses, paid, paidGroups, expanded, onToggle }: {
+function PersonCard({ name, color, bgColor, totalExpenses, paid, onPress }: {
   name: string; color: string; bgColor: string;
-  totalExpenses: number; paid: number;
-  paidGroups: PaidGroup[]; expanded: boolean; onToggle: () => void;
+  totalExpenses: number; paid: number; onPress: () => void;
 }) {
   return (
-    <View style={[styles.personCard, { borderTopColor: color }]}>
+    <TouchableOpacity style={[styles.personCard, { borderTopColor: color }]} onPress={onPress} activeOpacity={0.8}>
       <Text style={[styles.personName, { color }]} numberOfLines={1}>{name}</Text>
 
       <View style={[styles.pill, { backgroundColor: bgColor }]}>
@@ -242,24 +248,60 @@ function PersonCard({ name, color, bgColor, totalExpenses, paid, paidGroups, exp
         <Text style={[styles.pillValue, { color }]}>{fmt(totalExpenses)}</Text>
       </View>
 
-      {/* Paid — expandable */}
-      <TouchableOpacity style={styles.miniRow} onPress={onToggle} activeOpacity={0.7}>
+      <View style={styles.miniRow}>
         <Text style={styles.miniLabel}>Paid</Text>
         <View style={styles.miniRowRight}>
           <Text style={[styles.miniValue, styles.green]}>{fmt(paid)}</Text>
-          {paidGroups.length > 0 && (
-            <Ionicons name={expanded ? 'chevron-up' : 'chevron-down'} size={12} color={Colors.textMuted} style={{ marginLeft: 4 }} />
-          )}
+          <Ionicons name="chevron-forward" size={12} color={Colors.textMuted} style={{ marginLeft: 4 }} />
         </View>
-      </TouchableOpacity>
+      </View>
+    </TouchableOpacity>
+  );
+}
 
-      {expanded && paidGroups.map(g => (
-        <View key={g.label} style={styles.paidTxRow}>
-          <Text style={styles.paidTxDesc} numberOfLines={1}>{g.label}</Text>
-          <Text style={styles.paidTxAmt}>{fmt(g.total)}</Text>
-        </View>
-      ))}
-    </View>
+function PaidGroupsPopup({ data, onClose }: {
+  data: { name: string; color: string; bgColor: string; groups: PaidGroup[]; paid: number } | null;
+  onClose: () => void;
+}) {
+  if (!data) return null;
+  const { name, color, bgColor, groups, paid } = data;
+  return (
+    <Modal visible transparent animationType="slide" onRequestClose={onClose}>
+      <TouchableOpacity style={styles.popupOverlay} activeOpacity={1} onPress={onClose}>
+        <TouchableOpacity activeOpacity={1} style={styles.paidPopupCard} onPress={() => {}}>
+          {/* Header */}
+          <View style={[styles.paidPopupHeader, { borderBottomColor: color }]}>
+            <View style={[styles.paidPopupBadge, { backgroundColor: bgColor }]}>
+              <Text style={[styles.paidPopupName, { color }]}>{name}</Text>
+            </View>
+            <Text style={styles.paidPopupTitle}>Paid Breakdown</Text>
+            <TouchableOpacity onPress={onClose} style={styles.paidPopupClose}>
+              <Ionicons name="close" size={20} color={Colors.textMuted} />
+            </TouchableOpacity>
+          </View>
+
+          {/* Category rows */}
+          <ScrollView style={styles.paidPopupScroll} showsVerticalScrollIndicator={false}>
+            {groups.length === 0 ? (
+              <Text style={styles.paidPopupEmpty}>No payments recorded</Text>
+            ) : (
+              groups.map((g, i) => (
+                <View key={g.label} style={[styles.paidGroupRow, i < groups.length - 1 && styles.paidGroupBorder]}>
+                  <Text style={styles.paidGroupLabel}>{g.label}</Text>
+                  <Text style={[styles.paidGroupAmt, { color }]}>{fmt(g.total)}</Text>
+                </View>
+              ))
+            )}
+          </ScrollView>
+
+          {/* Total */}
+          <View style={[styles.paidPopupFooter, { backgroundColor: bgColor }]}>
+            <Text style={[styles.paidPopupFooterLabel, { color }]}>Total Paid</Text>
+            <Text style={[styles.paidPopupFooterAmt, { color }]}>{fmt(paid)}</Text>
+          </View>
+        </TouchableOpacity>
+      </TouchableOpacity>
+    </Modal>
   );
 }
 
@@ -382,4 +424,20 @@ const styles = StyleSheet.create({
   popupTxDesc:     { flex: 1, fontSize: 12, color: Colors.textSecondary },
   popupTxAmt:      { fontSize: 12, fontWeight: '700', color: Colors.textPrimary },
   popupTxOwner:    { fontSize: 10, color: Colors.textMuted, width: 28, textAlign: 'right' },
+
+  paidPopupCard:        { width: '100%', backgroundColor: Colors.card, borderRadius: 20, overflow: 'hidden', shadowColor: '#000', shadowOpacity: 0.2, shadowRadius: 20, elevation: 10 },
+  paidPopupHeader:      { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 16, borderBottomWidth: 2 },
+  paidPopupBadge:       { borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4 },
+  paidPopupName:        { fontSize: 13, fontWeight: '800' },
+  paidPopupTitle:       { flex: 1, fontSize: 15, fontWeight: '700', color: Colors.textPrimary },
+  paidPopupClose:       { padding: 4 },
+  paidPopupScroll:      { maxHeight: 320, paddingHorizontal: 16 },
+  paidPopupEmpty:       { textAlign: 'center', color: Colors.textMuted, paddingVertical: 24, fontSize: 13 },
+  paidGroupRow:         { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 13 },
+  paidGroupBorder:      { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: Colors.border },
+  paidGroupLabel:       { fontSize: 14, color: Colors.textPrimary, fontWeight: '500' },
+  paidGroupAmt:         { fontSize: 14, fontWeight: '700' },
+  paidPopupFooter:      { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 14 },
+  paidPopupFooterLabel: { fontSize: 13, fontWeight: '600' },
+  paidPopupFooterAmt:   { fontSize: 16, fontWeight: '800' },
 });

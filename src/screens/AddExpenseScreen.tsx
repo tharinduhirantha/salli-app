@@ -27,6 +27,7 @@ export default function AddExpenseScreen() {
 
   const [categories, setCategories] = useState<Category[]>([]);
   const [houseMembers, setHouseMembers] = useState<HouseMember[]>([]);
+  const [catSearch, setCatSearch] = useState('');
   const [date, setDate] = useState(existing?.date ?? (month ? `${month}-01` : today()));
   const [category, setCategory] = useState(existing?.category ?? 'Food');
   const [owner, setOwner] = useState<Owner>(existing?.owner ?? currentUser?.nickname ?? '');
@@ -35,6 +36,7 @@ export default function AddExpenseScreen() {
   const [status, setStatus] = useState<PayStatus>(existing?.status ?? 'P');
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>(existing?.paymentMethod ?? 'Card');
   const [saving, setSaving] = useState(false);
+  const [catExpanded, setCatExpanded] = useState(false);
 
   const isPersonal = category === 'Personal';
 
@@ -44,7 +46,7 @@ export default function AddExpenseScreen() {
 
   useEffect(() => {
     if (!currentHouse) return;
-    getCategories(currentHouse.id).then(setCategories);
+    getCategories(currentHouse.id).then(cats => setCategories(cats.filter(c => !c.isRecurring)));
     getHouseMembers(currentHouse.id).then(setHouseMembers);
   }, [currentHouse]);
 
@@ -84,59 +86,125 @@ export default function AddExpenseScreen() {
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <ScrollView style={styles.container} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
 
-        <DatePickerInput label="Date" value={date} onChange={setDate} />
-
-        {/* Category — moved after Date */}
-        <Label text="Category" />
-        <View style={styles.catGrid}>
-          {categories.map((c) => {
-            const active = category === c.name;
-            const chipColor = categoryColor[c.name] ?? Colors.primary;
-            return (
-              <TouchableOpacity
-                key={c.id}
-                style={[styles.catChip, active && { backgroundColor: chipColor, borderColor: chipColor }]}
-                onPress={() => setCategory(c.name)}
-              >
-                <Ionicons
-                  name={(c.icon ?? 'help-circle-outline') as any}
-                  size={14}
-                  color={active ? '#fff' : (chipColor)}
-                />
-                <Text style={[styles.catChipText, active && styles.catChipTextActive]}>{c.name}</Text>
-                {c.isRecurring && (
-                  <View style={[styles.catFlag, { backgroundColor: active ? 'rgba(255,255,255,0.28)' : Colors.primary + '20' }]}>
-                    <Ionicons name="repeat" size={9} color={active ? '#fff' : Colors.primary} />
-                  </View>
-                )}
-                {c.isOutOfPocket && (
-                  <View style={[styles.catFlag, { backgroundColor: active ? 'rgba(255,255,255,0.28)' : '#F59E0B20' }]}>
-                    <Ionicons name="person" size={9} color={active ? '#fff' : '#F59E0B'} />
-                  </View>
-                )}
-              </TouchableOpacity>
-            );
-          })}
-        </View>
-        <View style={styles.catLegend}>
-          <Ionicons name="repeat" size={10} color={Colors.primary} />
-          <Text style={styles.catLegendText}>Recurring</Text>
-          <Ionicons name="person" size={10} color="#F59E0B" style={{ marginLeft: 10 }} />
-          <Text style={styles.catLegendText}>Out of pocket</Text>
+        {/* Date + Category — side by side */}
+        <View style={styles.inlineRow}>
+          <View style={styles.inlineCol}>
+            <Label text="Date" />
+            <DatePickerInput value={date} onChange={setDate} />
+          </View>
+          <View style={styles.inlineCol}>
+            <Label text="Category" />
+            {(() => {
+              const sel = categories.find(c => c.name === category);
+              const chipColor = sel ? (categoryColor[sel.name] ?? Colors.primary) : Colors.primary;
+              return (
+                <TouchableOpacity
+                  style={[styles.catSelector, { borderColor: catExpanded ? chipColor : Colors.border }]}
+                  onPress={() => setCatExpanded(e => !e)}
+                  activeOpacity={0.8}
+                >
+                  {sel && <Ionicons name={(sel.icon ?? 'help-circle-outline') as any} size={15} color={chipColor} />}
+                  <Text style={[styles.catSelectorText, { color: chipColor }]} numberOfLines={1}>
+                    {category || 'Select…'}
+                  </Text>
+                  <Ionicons name={catExpanded ? 'chevron-up' : 'chevron-down'} size={13} color={Colors.textMuted} />
+                </TouchableOpacity>
+              );
+            })()}
+          </View>
         </View>
 
-        {/* Owner — label changes based on category */}
-        <Label text={isPersonal ? 'Owner' : 'Paid By'} />
-        <View style={styles.segmented}>
-          {houseMembers.map((m, i) => (
-            <TouchableOpacity
-              key={m.nickname}
-              style={[styles.segment, owner === m.nickname && styles.segmentActive, owner === m.nickname && { backgroundColor: USER_COLORS[i % USER_COLORS.length] }]}
-              onPress={() => setOwner(m.nickname)}
-            >
-              <Text style={[styles.segmentText, owner === m.nickname && styles.segmentTextActive]}>{m.nickname}</Text>
-            </TouchableOpacity>
-          ))}
+        {/* Category picker panel */}
+        {catExpanded && (
+          <View style={styles.catPanel}>
+            <View style={styles.catGrid}>
+              {categories.slice(0, 5).map((c) => {
+                const active = category === c.name;
+                const chipColor = categoryColor[c.name] ?? Colors.primary;
+                return (
+                  <TouchableOpacity
+                    key={c.id}
+                    style={[styles.catChip, active && { backgroundColor: chipColor, borderColor: chipColor }]}
+                    onPress={() => { setCategory(c.name); setCatSearch(''); setCatExpanded(false); }}
+                  >
+                    <Ionicons name={(c.icon ?? 'help-circle-outline') as any} size={13} color={active ? '#fff' : chipColor} />
+                    <Text style={[styles.catChipText, active && styles.catChipTextActive]}>{c.name}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+            <View style={styles.catSearchWrap}>
+              <Ionicons name="search-outline" size={14} color={Colors.textMuted} />
+              <TextInput
+                style={styles.catSearchInput}
+                value={catSearch}
+                onChangeText={setCatSearch}
+                placeholder="Search all categories…"
+                placeholderTextColor={Colors.textMuted}
+              />
+              {!!catSearch && (
+                <TouchableOpacity onPress={() => setCatSearch('')}>
+                  <Ionicons name="close-circle" size={14} color={Colors.textMuted} />
+                </TouchableOpacity>
+              )}
+            </View>
+            {catSearch.length > 0 && (
+              <View style={styles.catDropdown}>
+                {categories
+                  .filter(c => c.name.toLowerCase().includes(catSearch.toLowerCase()))
+                  .map((c) => {
+                    const active = category === c.name;
+                    const chipColor = categoryColor[c.name] ?? Colors.primary;
+                    return (
+                      <TouchableOpacity
+                        key={c.id}
+                        style={[styles.catDropRow, active && { backgroundColor: chipColor + '18' }]}
+                        onPress={() => { setCategory(c.name); setCatSearch(''); setCatExpanded(false); }}
+                      >
+                        <View style={[styles.catDropIcon, { backgroundColor: chipColor + '22' }]}>
+                          <Ionicons name={(c.icon ?? 'help-circle-outline') as any} size={14} color={chipColor} />
+                        </View>
+                        <Text style={[styles.catDropText, active && { color: chipColor, fontWeight: '700' }]}>{c.name}</Text>
+                        {active && <Ionicons name="checkmark" size={14} color={chipColor} />}
+                      </TouchableOpacity>
+                    );
+                  })}
+              </View>
+            )}
+          </View>
+        )}
+
+        {/* Paid By + Payment Status — side by side */}
+        <View style={styles.inlineRow}>
+          <View style={styles.inlineCol}>
+            <Label text={isPersonal ? 'Owner' : 'Paid By'} />
+            <View style={styles.segmented}>
+              {houseMembers.map((m, i) => (
+                <TouchableOpacity
+                  key={m.nickname}
+                  style={[styles.segment, owner === m.nickname && styles.segmentActive, owner === m.nickname && { backgroundColor: USER_COLORS[i % USER_COLORS.length] }]}
+                  onPress={() => setOwner(m.nickname)}
+                >
+                  <Text style={[styles.segmentSmall, owner === m.nickname && styles.segmentTextActive]}>{m.nickname}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+
+          <View style={styles.inlineCol}>
+            <Label text="Status" />
+            <View style={styles.segmented}>
+              {[{ label: 'Paid', value: 'P' as PayStatus }, { label: 'Unpaid', value: 'NP' as PayStatus }].map((opt) => (
+                <TouchableOpacity
+                  key={opt.value}
+                  style={[styles.segment, status === opt.value && styles.segmentActive, status === opt.value && { backgroundColor: opt.value === 'P' ? Colors.success : Colors.danger }]}
+                  onPress={() => setStatus(opt.value)}
+                >
+                  <Text style={[styles.segmentSmall, status === opt.value && styles.segmentTextActive]}>{opt.label}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
         </View>
 
         {/* Description */}
@@ -160,19 +228,6 @@ export default function AddExpenseScreen() {
           placeholderTextColor={Colors.textMuted}
         />
 
-        {/* Payment status */}
-        <Label text="Payment Status" />
-        <View style={styles.segmented}>
-          {[{ label: 'Paid', value: 'P' as PayStatus }, { label: 'Not Paid', value: 'NP' as PayStatus }].map((opt) => (
-            <TouchableOpacity
-              key={opt.value}
-              style={[styles.segment, status === opt.value && styles.segmentActive, status === opt.value && { backgroundColor: opt.value === 'P' ? Colors.success : Colors.danger }]}
-              onPress={() => setStatus(opt.value)}
-            >
-              <Text style={[styles.segmentText, status === opt.value && styles.segmentTextActive]}>{opt.label}</Text>
-            </TouchableOpacity>
-          ))}
-        </View>
 
         {/* Payment Method */}
         <Label text="Payment Method" />
@@ -217,21 +272,30 @@ function Label({ text }: { text: string }) {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.bg },
   content: { padding: 16, paddingBottom: 40 },
-  label: { fontSize: 13, fontWeight: '600', color: Colors.textSecondary, marginBottom: 6, marginTop: 16, textTransform: 'uppercase', letterSpacing: 0.5 },
+  label: { fontSize: 11, fontWeight: '600', color: Colors.textSecondary, marginBottom: 6, marginTop: 16, textTransform: 'uppercase', letterSpacing: 0.5 },
   input: { backgroundColor: Colors.card, borderRadius: 12, borderWidth: 1, borderColor: Colors.border, paddingHorizontal: 14, paddingVertical: 12, fontSize: 15, color: Colors.textPrimary },
   amountInput: { fontSize: 22, fontWeight: '700', textAlign: 'center', paddingVertical: 16 },
-  segmented: { flexDirection: 'row', gap: 8 },
-  segment: { flex: 1, flexDirection: 'row', paddingVertical: 12, borderRadius: 12, borderWidth: 1, borderColor: Colors.border, backgroundColor: Colors.card, alignItems: 'center', justifyContent: 'center', gap: 5 },
+  inlineRow: { flexDirection: 'row', gap: 12, marginTop: 16 },
+  inlineCol: { flex: 1 },
+  segmented: { flexDirection: 'row', gap: 6 },
+  segment: { flex: 1, flexDirection: 'row', paddingVertical: 10, borderRadius: 12, borderWidth: 1, borderColor: Colors.border, backgroundColor: Colors.card, alignItems: 'center', justifyContent: 'center', gap: 4 },
   segmentActive: { borderColor: 'transparent' },
   segmentText: { fontSize: 14, fontWeight: '600', color: Colors.textSecondary },
+  segmentSmall: { fontSize: 12, fontWeight: '600', color: Colors.textSecondary },
   segmentTextActive: { color: '#fff' },
-  catGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  catChip: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 20, borderWidth: 1, borderColor: Colors.border, backgroundColor: Colors.card },
-  catChipText: { fontSize: 13, color: Colors.textSecondary, fontWeight: '500' },
+  catSelector: { flexDirection: 'row', alignItems: 'center', gap: 7, backgroundColor: Colors.card, borderRadius: 12, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 13 },
+  catSelectorText: { flex: 1, fontSize: 13, fontWeight: '600' },
+  catPanel: { backgroundColor: Colors.card, borderRadius: 14, borderWidth: 1, borderColor: Colors.border, padding: 12, gap: 10, marginTop: 4 },
+  catGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 7 },
+  catChip: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 20, borderWidth: 1, borderColor: Colors.border, backgroundColor: Colors.bg },
+  catChipText: { fontSize: 12, color: Colors.textSecondary, fontWeight: '500' },
   catChipTextActive: { color: '#fff', fontWeight: '700' },
-  catFlag: { width: 16, height: 16, borderRadius: 4, alignItems: 'center', justifyContent: 'center' },
-  catLegend: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 6 },
-  catLegendText: { fontSize: 10, color: Colors.textMuted, fontWeight: '500' },
+  catSearchWrap: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: Colors.bg, borderRadius: 10, borderWidth: 1, borderColor: Colors.border, paddingHorizontal: 10, paddingVertical: 8 },
+  catSearchInput: { flex: 1, fontSize: 13, color: Colors.textPrimary },
+  catDropdown: { backgroundColor: Colors.bg, borderRadius: 10, borderWidth: 1, borderColor: Colors.border, overflow: 'hidden' },
+  catDropRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 12, paddingVertical: 10 },
+  catDropIcon: { width: 28, height: 28, borderRadius: 7, alignItems: 'center', justifyContent: 'center' },
+  catDropText: { flex: 1, fontSize: 13, color: Colors.textPrimary, fontWeight: '500' },
   saveBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: Colors.primary, borderRadius: 14, paddingVertical: 16, marginTop: 28, gap: 8 },
   saveBtnText: { color: '#fff', fontSize: 16, fontWeight: '700' },
   deleteBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, borderWidth: 1.5, borderColor: Colors.danger, borderRadius: 14, paddingVertical: 14, marginTop: 12 },

@@ -42,6 +42,7 @@ export interface MonthlySummary {
 }
 
 export interface PersonUserSummary {
+  userId: string;
   nickname: string;
   fullName: string;
   personalTotal: number;
@@ -609,6 +610,7 @@ export async function getRecurringPayments(month: string, houseId: string): Prom
 export interface DueUserOwes {
   userKey: string;
   nickname: string;
+  fullName: string;
   owes: number;
   isPaid: boolean;
 }
@@ -633,16 +635,19 @@ export async function getDueRecurringPayments(
     getHouseMembers(houseId),
   ]);
   const nickMap: Record<string, string> = {};
-  houseMembers.forEach(m => { nickMap[m.userId] = m.nickname; });
+  const nameMap: Record<string, string> = {};
+  houseMembers.forEach(m => { nickMap[m.userId] = m.nickname; nameMap[m.userId] = m.fullName; });
   return payments
     .map(p => {
       const userOwes: DueUserOwes[] = [];
+      const anyPaidEntered = p.userShares.some(s => s.paid > 0);
       p.userShares.forEach(s => {
-        if (s.pay <= 0 && s.paid <= 0) return;
-        const responsible = s.paid > 0 ? s.paid : s.pay; // use entered amount if available, else split
+        const responsible = anyPaidEntered ? s.paid : s.pay;
+        if (responsible <= 0) return;
         userOwes.push({
           userKey: s.userId,
           nickname: nickMap[s.userId] ?? s.userId,
+          fullName: nameMap[s.userId] ?? nickMap[s.userId] ?? s.userId,
           owes: s.isPaid ? 0 : responsible,
           isPaid: s.isPaid,
         });
@@ -658,14 +663,19 @@ export async function getDueRecurringPayments(
 }
 
 export async function getDueTransactions(month: string, houseId: string): Promise<DuePayment[]> {
-  const { data, error } = await supabase
-    .from('transactions')
-    .select('id, description, date, category, amount, payment_method, owner, status')
-    .eq('month', month)
-    .eq('house_id', houseId)
-    .eq('status', 'NP')
-    .order('date', { ascending: false });
+  const [{ data, error }, members] = await Promise.all([
+    supabase
+      .from('transactions')
+      .select('id, description, date, category, amount, payment_method, owner, status')
+      .eq('month', month)
+      .eq('house_id', houseId)
+      .eq('status', 'NP')
+      .order('date', { ascending: false }),
+    getHouseMembers(houseId),
+  ]);
   if (error) throw new Error(error.message);
+  const fullNameByNick: Record<string, string> = {};
+  members.forEach(m => { fullNameByNick[m.nickname] = m.fullName; });
   return (data ?? []).map((r: any) => ({
     id: r.id,
     name: r.description,
@@ -677,6 +687,7 @@ export async function getDueTransactions(month: string, houseId: string): Promis
     userOwes: [{
       userKey: r.owner,
       nickname: r.owner,
+      fullName: fullNameByNick[r.owner] ?? r.owner,
       owes: r.amount,
       isPaid: false,
     }],
@@ -951,7 +962,7 @@ export async function getPersonalHouseSummary(month: string, houseId: string): P
     const housePaid  = (txPaidAcc[m.nickname] ?? 0) + (recPaidAcc[m.nickname] ?? 0);
     const grandTotal = (personalTotalAcc[m.nickname] ?? 0) + houseNeeds;
     return {
-      nickname: m.nickname, fullName: m.fullName,
+      userId: m.userId, nickname: m.nickname, fullName: m.fullName,
       personalTotal:   personalTotalAcc[m.nickname] ?? 0,
       personalPending: personalPendingAcc[m.nickname] ?? 0,
       houseNeeds, housePaid, housePending: houseNeeds - housePaid,

@@ -1,9 +1,10 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createStackNavigator } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
 import { Platform, View, Image, StyleSheet, AppState } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { Session } from '@supabase/supabase-js';
 
 import { supabase } from '../lib/supabase';
@@ -103,6 +104,22 @@ function MainTabs() {
 
 function RootNavigator() {
   const { currentHouse, refresh } = useHouse();
+  const prevHouseRef = useRef<typeof currentHouse>(null);
+
+  useEffect(() => {
+    if (prevHouseRef.current === null && currentHouse !== null) {
+      const key = `@salli/guideSeen_${currentHouse.id}`;
+      AsyncStorage.getItem(key).then(seen => {
+        if (!seen) {
+          AsyncStorage.setItem(key, '1');
+          setTimeout(() => {
+            if (navigationRef.isReady()) navigationRef.navigate('Guide' as never);
+          }, 400);
+        }
+      });
+    }
+    prevHouseRef.current = currentHouse;
+  }, [currentHouse]);
 
   useEffect(() => {
     if (!currentHouse) return;
@@ -128,7 +145,7 @@ function RootNavigator() {
           <Stack.Screen name="ProfileHousehold" component={SettingsProfileScreen}    options={{ title: 'Profile & Household' }} />
           <Stack.Screen name="SalarySplit"      component={SettingsSalaryScreen}     options={{ title: 'Salary Split' }} />
           <Stack.Screen name="Categories"       component={SettingsCategoriesScreen} options={{ title: 'Categories' }} />
-          <Stack.Screen name="Guide"            component={GuideScreen}              options={{ title: 'How Salli Works' }} />
+          <Stack.Screen name="Guide"            component={GuideScreen}              options={{ headerShown: false }} />
         </>
       ) : (
         <Stack.Screen name="HouseSetup" component={HouseSetupScreen} options={{ headerShown: false }} />

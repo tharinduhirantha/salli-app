@@ -5,9 +5,30 @@ import { Ionicons } from '@expo/vector-icons';
 import { getPersonalHouseSummary, PersonHouseSummary, PersonUserSummary, getPaymentMethodTotals, PaymentMethodTotals, getDueRecurringPayments, getDueTransactions, DuePayment, DueUserOwes, markRecurringUserPaid, markTransactionPaid } from '../db/queries';
 import { useHouse } from '../context/HouseContext';
 import { monthLabel } from '../utils/date';
-import { Colors, fmt } from '../utils/theme';
+import { Colors, fmt, categoryColor } from '../utils/theme';
 const USER_COLORS = [Colors.th, Colors.ma, Colors.user3, Colors.user4];
 const USER_LIGHT  = [Colors.thLight, Colors.maLight, Colors.successLight, Colors.dangerLight];
+
+const ICON_MAP: Record<string, string> = {
+  Food:         'restaurant-outline',
+  Household:    'home-outline',
+  Car:          'car-outline',
+  Bill:         'receipt-outline',
+  Baby:         'heart-outline',
+  Maintenance:  'construct-outline',
+  Other:        'ellipsis-horizontal-circle-outline',
+  Fun:          'game-controller-outline',
+  Subscription: 'phone-portrait-outline',
+  Shopping:     'bag-handle-outline',
+  Online:       'globe-outline',
+  Taxi:         'car-sport-outline',
+  Medicine:     'medkit-outline',
+  Installment:  'card-outline',
+  Deposit:      'wallet-outline',
+  Personal:     'person-outline',
+  Loan:         'cash-outline',
+  Rent:         'business-outline',
+};
 
 export default function StatusScreen() {
   const { currentHouse, month, goToPrevMonth, goToNextMonth } = useHouse();
@@ -15,13 +36,14 @@ export default function StatusScreen() {
   const [pmTotals, setPmTotals] = useState<PaymentMethodTotals>({
     Cash: { total: 0, due: 0 }, Card: { total: 0, due: 0 }, Account: { total: 0, due: 0 },
   });
-  const [duePayments, setDuePayments] = useState<DuePayment[]>([]);
+  const [dueRec, setDueRec] = useState<DuePayment[]>([]);
+  const [dueTx, setDueTx]   = useState<DuePayment[]>([]);
   const [loading, setLoading]   = useState(true);
 
   const load = useCallback(async () => {
     if (!currentHouse) return;
     setLoading(true);
-    const [sum, pm, dueRec, dueTx] = await Promise.all([
+    const [sum, pm, rec, tx] = await Promise.all([
       getPersonalHouseSummary(month, currentHouse.id),
       getPaymentMethodTotals(month, currentHouse.id),
       getDueRecurringPayments(month, currentHouse.id),
@@ -29,7 +51,8 @@ export default function StatusScreen() {
     ]);
     setSummary(sum);
     setPmTotals(pm);
-    setDuePayments([...dueRec, ...dueTx]);
+    setDueRec(rec);
+    setDueTx(tx);
     setLoading(false);
   }, [month, currentHouse]);
 
@@ -61,12 +84,13 @@ export default function StatusScreen() {
             </View>
           ) : (
             summary.users.map((u, i) => (
-              <PersonCard key={u.nickname} user={u} accentColor={USER_COLORS[i] ?? Colors.primary} lightColor={USER_LIGHT[i] ?? Colors.successLight} />
+              <PersonCard key={u.nickname} user={u} accentColor={Colors.navy} lightColor={Colors.primaryLight} />
             ))
           )}
           <SettlementCard
             totals={pmTotals}
-            duePayments={duePayments}
+            dueRecurring={dueRec}
+            duePersonal={dueTx}
             onMarkUserPaid={async (id, user, source) => {
               if (source === 'transaction') await markTransactionPaid(id);
               else await markRecurringUserPaid(id, user);
@@ -119,102 +143,173 @@ function SectionLabel({ text, color }: { text: string; color: string }) {
 }
 
 const PM_CONFIG: { key: string; label: string; icon: string; color: string }[] = [
-  { key: 'Account', label: 'Account', icon: 'wallet-outline',  color: Colors.primary },
-  { key: 'Card',    label: 'Card',    icon: 'card-outline',    color: Colors.ma      },
-  { key: 'Cash',    label: 'Cash',    icon: 'cash-outline',    color: Colors.success },
+  { key: 'Account', label: 'Account', icon: 'wallet-outline', color: Colors.primary },
+  { key: 'Card',    label: 'Card',    icon: 'card-outline',   color: Colors.ma      },
+  { key: 'Cash',    label: 'Cash',    icon: 'cash-outline',   color: Colors.success },
 ];
 
-function SettlementCard({ totals, duePayments, onMarkUserPaid }: {
+function SettlementCard({ totals, dueRecurring, duePersonal, onMarkUserPaid }: {
   totals: PaymentMethodTotals;
-  duePayments: DuePayment[];
+  dueRecurring: DuePayment[];
+  duePersonal: DuePayment[];
   onMarkUserPaid: (id: string, user: string, source: DuePayment['source']) => Promise<void>;
 }) {
+  const grandTotal = dueRecurring.reduce((s, p) => s + p.totalOwed, 0)
+                   + duePersonal.reduce((s, p) => s + p.totalOwed, 0);
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
+  const toggle = (key: string) => setCollapsed(prev => ({ ...prev, [key]: !prev[key] }));
 
-  const groups = PM_CONFIG
-    .map(pm => {
-      const items = duePayments.filter(p => p.paymentMethod === pm.key);
-      return {
-        ...pm,
-        items,
-        due: items.reduce((sum, p) => sum + p.totalOwed, 0),
-      };
-    })
-    .filter(g => g.items.length > 0);
+  // Group by payment method → user → { rec, per }
+  const pmGroups = PM_CONFIG.map(pm => {
+    const rec = dueRecurring.filter(p => p.paymentMethod === pm.key);
+    const per = duePersonal.filter(p => p.paymentMethod === pm.key);
 
-  const toggle = (key: string) =>
-    setCollapsed(prev => ({ ...prev, [key]: !prev[key] }));
+    // Collect unique users by nickname (consistent across both sources)
+    const userMap: Record<string, { nickname: string; fullName: string; userKey: string }> = {};
+    rec.forEach(p => p.userOwes.forEach(u => {
+      if (!u.isPaid) userMap[u.nickname] = { nickname: u.nickname, fullName: u.fullName, userKey: u.userKey };
+    }));
+    per.forEach(p => p.userOwes.forEach(u => {
+      userMap[u.nickname] = { nickname: u.nickname, fullName: u.fullName, userKey: u.userKey };
+    }));
+
+    const users = Object.values(userMap).map(user => {
+      const userRec = rec.filter(p => p.userOwes.some(u => u.nickname === user.nickname && !u.isPaid));
+      const userPer = per.filter(p => p.userOwes.some(u => u.nickname === user.nickname));
+      const recTotal = userRec.reduce((sum, p) => {
+        const share = p.userOwes.find(u => u.nickname === user.nickname);
+        return sum + (share?.owes ?? 0);
+      }, 0);
+      const perTotal = userPer.reduce((sum, p) => sum + p.totalOwed, 0);
+      return { ...user, userRec, userPer, recTotal, perTotal, userTotal: recTotal + perTotal };
+    }).filter(u => u.userTotal > 0);
+
+    const pmTotal = users.reduce((sum, u) => sum + u.userTotal, 0);
+    return { ...pm, users, pmTotal };
+  }).filter(g => g.pmTotal > 0);
 
   return (
-    <View style={s.settlementCard}>
-      <View style={s.settlementHeader}>
-        <Ionicons name="swap-horizontal-outline" size={18} color={Colors.primary} />
-        <Text style={s.settlementTitle}>Due Payments</Text>
-      </View>
-      {groups.length === 0 ? (
-        <View style={s.settlementEmpty}>
+    <>
+      {/* Section label */}
+      <Text style={s.settlementTitle}>Settlement</Text>
+      <Text style={s.settlementDesc}>Outstanding amounts grouped by payment method and member. Tap Mark Paid to settle each item.</Text>
+
+      {grandTotal === 0 ? (
+        <View style={s.settlementAllSettled}>
           <Ionicons name="checkmark-circle-outline" size={22} color={Colors.success} />
           <Text style={s.settlementEmptyText}>All settled</Text>
         </View>
       ) : (
-        groups.map((g, gi) => {
-          const isCollapsed = collapsed[g.key] !== false; // default collapsed
-          return (
-            <View key={g.key} style={gi < groups.length - 1 && s.settlementGroupBorder}>
-              {/* Group header */}
-              <TouchableOpacity
-                style={s.settlementGroupHeader}
-                onPress={() => toggle(g.key)}
-                activeOpacity={0.7}
-              >
-                <View style={[s.settlementIcon, { backgroundColor: g.color + '18' }]}>
-                  <Ionicons name={g.icon as any} size={18} color={g.color} />
-                </View>
-                <Text style={[s.settlementLabel, { flex: 1 }]}>{g.label}</Text>
-                <Text style={[s.settlementValue, { color: Colors.danger, marginRight: 8 }]}>{fmt(g.due)}</Text>
-                <Ionicons
-                  name={isCollapsed ? 'chevron-down' : 'chevron-up'}
-                  size={16}
-                  color={Colors.textMuted}
-                />
-              </TouchableOpacity>
-
-              {/* Expanded items */}
-              {!isCollapsed && g.items.map((p, i) => (
-                <View key={p.id} style={[s.settlementRow, s.settlementItemIndent, i < g.items.length - 1 && s.settlementRowBorder]}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={s.settlementItemName}>{p.name}</Text>
-                    <Text style={s.settlementItemType}>{p.type}</Text>
-                  </View>
-                  <View style={s.settlementBtnCol}>
-                    <Text style={[s.settlementValue, { color: Colors.danger, textAlign: 'right', marginBottom: 6 }]}>{fmt(p.totalOwed)}</Text>
-                    <View style={s.settlementUserBtns}>
-                      {p.userOwes.map((u, ui) => (
-                        u.isPaid ? (
-                          <View key={u.userKey} style={[s.settlementPaidBadge, { backgroundColor: Colors.successLight }]}>
-                            <Ionicons name="checkmark-circle" size={12} color={Colors.success} />
-                            <Text style={[s.settlementPaidBtnText, { color: Colors.success }]}>{u.nickname} Paid</Text>
-                          </View>
-                        ) : (
-                          <TouchableOpacity
-                            key={u.userKey}
-                            style={[s.settlementPaidBtn, { backgroundColor: USER_COLORS[ui] ?? Colors.primary }]}
-                            onPress={() => onMarkUserPaid(p.id, u.userKey, p.source)}
-                          >
-                            <Ionicons name="checkmark-circle" size={12} color="#fff" />
-                            <Text style={s.settlementPaidBtnText}>{u.nickname} Mark Paid</Text>
-                          </TouchableOpacity>
-                        )
-                      ))}
-                    </View>
-                  </View>
-                </View>
-              ))}
+        pmGroups.map(g => (
+          <View key={g.key} style={s.pmCard}>
+            {/* Payment method header */}
+            <View style={s.pmHeader}>
+              <View style={s.pmIcon}>
+                <Ionicons name={g.icon as any} size={17} color={Colors.navy} />
+              </View>
+              <Text style={s.pmLabel}>{g.label}</Text>
+              <Text style={s.pmTotal}>{fmt(g.pmTotal)}</Text>
             </View>
-          );
-        })
+
+            {/* Per-user rows */}
+            {g.users.map((user, ui) => {
+              const colKey = `${g.key}_${user.nickname}`;
+              const isOpen = collapsed[colKey] === true;
+              return (
+              <View key={user.nickname} style={[s.userBlock, ui < g.users.length - 1 && s.userBlockBorder]}>
+                {/* User header */}
+                <TouchableOpacity style={s.userHeader} onPress={() => toggle(colKey)} activeOpacity={0.7}>
+                  <View style={s.userIconBox}>
+                    <Ionicons name="person" size={14} color={Colors.primary} />
+                  </View>
+                  <Text style={s.userHeaderName}>{user.fullName}</Text>
+                  <Text style={s.userHeaderTotal}>{fmt(user.userTotal)}</Text>
+                  <Ionicons name={isOpen ? 'chevron-up' : 'chevron-down'} size={16} color={Colors.textMuted} style={{ marginLeft: 6 }} />
+                </TouchableOpacity>
+
+                {/* Due Payments */}
+                {isOpen && user.userRec.length > 0 && (
+                  <View style={s.subBlock}>
+                    <View style={s.subHeader}>
+                      <View style={[s.subChip, { backgroundColor: Colors.primary + '15' }]}>
+                        <Ionicons name="swap-horizontal-outline" size={13} color={Colors.primary} />
+                        <Text style={[s.subChipText, { color: Colors.primary }]}>Due Payments</Text>
+                      </View>
+                      <Text style={s.subTotal}>{fmt(user.recTotal)}</Text>
+                    </View>
+                    {user.userRec.map((p, i) => {
+                      const share    = p.userOwes.find(u => u.nickname === user.nickname)!;
+                      const catColor = categoryColor[p.type] ?? Colors.textMuted;
+                      const catIcon  = ICON_MAP[p.type] ?? 'help-circle-outline';
+                      return (
+                        <View key={p.id} style={[s.itemRow, s.itemIndent, i < user.userRec.length - 1 && s.itemBorder]}>
+                          <View style={[s.catIconBox, { backgroundColor: catColor + '20' }]}>
+                            <Ionicons name={catIcon as any} size={15} color={catColor} />
+                          </View>
+                          <View style={{ flex: 1 }}>
+                            <Text style={s.itemName}>{p.name}</Text>
+                            <Text style={s.itemType}>{p.type}</Text>
+                          </View>
+                          <View style={s.itemRight}>
+                            <Text style={[s.itemAmt, { color: '#4B5563' }]}>{fmt(share.owes)}</Text>
+                            <TouchableOpacity
+                              style={[s.settlementPaidBtn, { backgroundColor: Colors.navy }]}
+                              onPress={() => onMarkUserPaid(p.id, share.userKey, p.source)}
+                            >
+                              <Ionicons name="checkmark-circle" size={12} color="#fff" />
+                              <Text style={s.settlementPaidBtnText}>Mark Paid</Text>
+                            </TouchableOpacity>
+                          </View>
+                        </View>
+                      );
+                    })}
+                  </View>
+                )}
+
+                {/* Personal */}
+                {isOpen && user.userPer.length > 0 && (
+                  <View style={[s.subBlock, user.userRec.length > 0 && s.subBlockDivider]}>
+                    <View style={s.subHeader}>
+                      <View style={[s.subChip, { backgroundColor: Colors.primary + '15' }]}>
+                        <Ionicons name="person-outline" size={13} color={Colors.primary} />
+                        <Text style={[s.subChipText, { color: Colors.primary }]}>Personal</Text>
+                      </View>
+                      <Text style={s.subTotal}>{fmt(user.perTotal)}</Text>
+                    </View>
+                    {user.userPer.map((p, i) => {
+                      const catColor = categoryColor[p.type] ?? Colors.textMuted;
+                      const catIcon  = ICON_MAP[p.type] ?? 'help-circle-outline';
+                      return (
+                        <View key={p.id} style={[s.itemRow, s.itemIndent, i < user.userPer.length - 1 && s.itemBorder]}>
+                          <View style={[s.catIconBox, { backgroundColor: catColor + '20' }]}>
+                            <Ionicons name={catIcon as any} size={15} color={catColor} />
+                          </View>
+                          <View style={{ flex: 1 }}>
+                            <Text style={s.itemName}>{p.name}</Text>
+                            <Text style={s.itemType}>{p.type}</Text>
+                          </View>
+                          <View style={s.itemRight}>
+                            <Text style={[s.itemAmt, { color: '#4B5563' }]}>{fmt(p.totalOwed)}</Text>
+                            <TouchableOpacity
+                              style={[s.settlementPaidBtn, { backgroundColor: Colors.navy }]}
+                              onPress={() => onMarkUserPaid(p.id, p.userOwes[0].userKey, p.source)}
+                            >
+                              <Ionicons name="checkmark-circle" size={12} color="#fff" />
+                              <Text style={s.settlementPaidBtnText}>Mark Paid</Text>
+                            </TouchableOpacity>
+                          </View>
+                        </View>
+                      );
+                    })}
+                  </View>
+                )}
+              </View>
+              );
+            })}
+          </View>
+        ))
       )}
-    </View>
+    </>
   );
 }
 
@@ -265,26 +360,45 @@ const s = StyleSheet.create({
   grandValue:      { fontSize: 15, fontWeight: '800' },
   grandHint:       { fontSize: 9, color: Colors.textMuted, marginTop: 1 },
 
-  settlementCard:       { borderRadius: 20, backgroundColor: Colors.card, overflow: 'hidden', shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 16, elevation: 4 },
-  settlementHeader:     { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 20, paddingTop: 18, paddingBottom: 14, borderBottomWidth: 1, borderBottomColor: Colors.border },
-  settlementTitle:      { fontSize: 15, fontWeight: '800', color: Colors.textPrimary, flex: 1 },
-  settlementRow:        { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 14, gap: 12 },
-  settlementRowBorder:  { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: Colors.border },
-  settlementIcon:       { width: 38, height: 38, borderRadius: 11, alignItems: 'center', justifyContent: 'center' },
-  settlementLabel:      { flex: 1, fontSize: 14, fontWeight: '600', color: Colors.textPrimary },
-  settlementValue:        { fontSize: 15, fontWeight: '800' },
-  settlementGroupHeader:  { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 14, gap: 12 },
-  settlementGroupBorder:  { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: Colors.border },
-  settlementItemIndent:   { paddingLeft: 28, backgroundColor: Colors.bg },
-  settlementItemName:     { fontSize: 13, fontWeight: '600', color: Colors.textPrimary },
-  settlementItemType:     { fontSize: 11, color: Colors.textMuted, marginTop: 2 },
-  settlementBtnCol:       { alignItems: 'flex-end' },
-  settlementUserBtns:     { flexDirection: 'row', gap: 6 },
-  settlementPaidBtn:      { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 5, borderRadius: 8 },
-  settlementPaidBadge:    { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 5, borderRadius: 8 },
-  settlementPaidBtnText:  { fontSize: 11, fontWeight: '700', color: '#fff' },
-  settlementOwes:         { flexDirection: 'row', gap: 10, marginTop: 3 },
-  settlementOwesText:     { fontSize: 12, fontWeight: '600' },
-  settlementEmpty:        { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 20, paddingVertical: 16 },
-  settlementEmptyText:    { fontSize: 14, fontWeight: '600', color: Colors.success },
+  settlementTitle:       { fontSize: 16, fontWeight: '700', color: Colors.textPrimary, marginBottom: 4 },
+  settlementDesc:        { fontSize: 12, color: Colors.textMuted, lineHeight: 18, marginBottom: 10 },
+  settlementValue:       { fontSize: 15, fontWeight: '800' },
+  settlementPaidBtn:     { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 5, borderRadius: 8 },
+  settlementPaidBadge:   { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 5, borderRadius: 8 },
+  settlementPaidBtnText: { fontSize: 11, fontWeight: '700', color: '#fff' },
+  settlementAllSettled:  { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: Colors.card, borderRadius: 16, paddingHorizontal: 16, paddingVertical: 16 },
+  settlementEmptyText:   { fontSize: 14, fontWeight: '600', color: Colors.success },
+
+  pmCard:   { borderRadius: 16, backgroundColor: Colors.card, overflow: 'hidden', shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 12, elevation: 3 },
+  pmHeader: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16, paddingVertical: 13, backgroundColor: Colors.yellow },
+  pmIcon:   { width: 28, height: 28, borderRadius: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.1)' },
+  pmLabel:  { flex: 1, fontSize: 14, fontWeight: '800', color: Colors.navy },
+  pmTotal:  { fontSize: 14, fontWeight: '800', color: Colors.navy },
+
+  subBlock:        { },
+  subBlockDivider: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: Colors.border },
+  subHeader:       { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 8, gap: 8 },
+  subChip:         { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 20, flex: 1 },
+  subChipText:     { fontSize: 13, fontWeight: '700' },
+  subTotal:        { fontSize: 14, fontWeight: '800', color: Colors.navy },
+
+  itemRow:    { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 10, gap: 10 },
+  itemIndent: { paddingLeft: 28 },
+  itemBorder: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: Colors.border },
+  itemName:   { fontSize: 13, fontWeight: '600', color: Colors.textPrimary },
+  itemType:   { fontSize: 11, color: Colors.textMuted, marginTop: 1 },
+  itemRight:  { alignItems: 'flex-end', gap: 5 },
+  itemAmt:    { fontSize: 12, fontWeight: '700' },
+  btnRow:     { flexDirection: 'row', gap: 5 },
+  catIconBox: { width: 32, height: 32, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
+
+  subEmpty:    { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 16, paddingVertical: 10 },
+  subEmptyText:{ fontSize: 12, color: Colors.success, fontWeight: '600' },
+
+  userBlock:       { backgroundColor: Colors.card },
+  userBlockBorder: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: Colors.border },
+  userHeader:      { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 16, paddingVertical: 10, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: Colors.border },
+  userIconBox:     { width: 26, height: 26, borderRadius: 13, backgroundColor: Colors.primaryLight, alignItems: 'center', justifyContent: 'center' },
+  userHeaderName:  { flex: 1, fontSize: 13, fontWeight: '700', color: Colors.textPrimary },
+  userHeaderTotal: { fontSize: 13, fontWeight: '800', color: Colors.textPrimary },
 });

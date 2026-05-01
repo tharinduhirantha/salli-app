@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { View, Text, ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { useNavigation } from '@react-navigation/native';
 import { Colors } from '../utils/theme';
 
 interface GuideItem {
@@ -167,13 +169,21 @@ const GUIDE: GuideItem[] = [
 ];
 
 export default function GuideScreen() {
+  const navigation = useNavigation();
   const [expanded, setExpanded] = useState<Record<number, boolean>>({});
+  const insets = useSafeAreaInsets();
 
   const toggle = (i: number) =>
     setExpanded(prev => ({ ...prev, [i]: !prev[i] }));
 
   return (
-    <View style={s.outer}>
+    <View style={[s.outer, { paddingTop: insets.top }]}>
+      {/* Skip */}
+      <TouchableOpacity style={s.skipBtn} onPress={() => navigation.goBack()}>
+        <Text style={s.skipText}>Skip</Text>
+        <Ionicons name="chevron-forward" size={14} color={Colors.textMuted} />
+      </TouchableOpacity>
+
       <ScrollView contentContainerStyle={s.content} showsVerticalScrollIndicator={false}>
         <View style={s.hero}>
           <Ionicons name="book-outline" size={32} color={Colors.primary} />
@@ -218,13 +228,18 @@ export default function GuideScreen() {
           <Ionicons name="heart-outline" size={16} color={Colors.textMuted} />
           <Text style={s.footerText}>Salli — your household budget companion</Text>
         </View>
+
+        <TouchableOpacity style={s.gotItBtn} onPress={() => navigation.goBack()}>
+          <Ionicons name="checkmark-circle-outline" size={20} color="#fff" />
+          <Text style={s.gotItText}>Got it, let's go!</Text>
+        </TouchableOpacity>
       </ScrollView>
     </View>
   );
 }
 
 const s = StyleSheet.create({
-  outer:   { flex: 1 },
+  outer:   { flex: 1, backgroundColor: Colors.navy },
   content: { padding: 16, paddingTop: 28, paddingBottom: 48, gap: 12 },
 
   hero:      { alignItems: 'center', paddingVertical: 24, gap: 8 },
@@ -246,4 +261,10 @@ const s = StyleSheet.create({
 
   footer:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 8 },
   footerText: { fontSize: 12, color: Colors.textMuted },
+
+  skipBtn:  { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-end', gap: 4, paddingHorizontal: 16, paddingTop: 8, paddingBottom: 4 },
+  skipText: { fontSize: 13, color: Colors.textMuted, fontWeight: '600' },
+
+  gotItBtn:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: Colors.navy, borderRadius: 16, paddingVertical: 16, marginTop: 20 },
+  gotItText: { fontSize: 16, fontWeight: '700', color: '#fff' },
 });

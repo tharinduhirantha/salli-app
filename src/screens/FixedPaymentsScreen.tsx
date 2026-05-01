@@ -66,6 +66,7 @@ export default function FixedPaymentsScreen() {
   const [membersWithSplit, setMembersWithSplit] = useState<MemberWithSplit[]>([]);
   const [recurringCats, setRecurringCats] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
+  const [salaryEnabled, setSalaryEnabled] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
   const [editing, setEditing] = useState<RecurringPayment | null>(null);
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
@@ -85,6 +86,10 @@ export default function FixedPaymentsScreen() {
       nickname: mem.nickname,
       splitPct: splitPcts[mem.userId] ?? (100 / (m.length || 1)),
     }));
+    const enabled = m.length >= 2 &&
+      m.every(mem => splitPcts[mem.userId] != null) &&
+      Math.round(m.reduce((s, mem) => s + (splitPcts[mem.userId] ?? 0), 0)) === 100;
+    setSalaryEnabled(enabled);
     setMembersWithSplit(mws);
     setRecurringCats(cats.filter(c => c.isRecurring));
     setPayments(data);
@@ -259,6 +264,7 @@ export default function FixedPaymentsScreen() {
         houseId={currentHouse?.id ?? ''}
         members={membersWithSplit}
         recurringCats={recurringCats}
+        salaryEnabled={salaryEnabled}
         onClose={() => setModalVisible(false)}
         onSave={() => { setModalVisible(false); load(); }}
         onDelete={editing ? (id: string) => {
@@ -284,7 +290,7 @@ function SumChip({ label, value, color }: { label: string; value: string; color:
 }
 
 function PaymentModal({
-  visible, payment, month, houseId, members, recurringCats, onClose, onSave, onDelete,
+  visible, payment, month, houseId, members, recurringCats, salaryEnabled, onClose, onSave, onDelete,
 }: {
   visible: boolean;
   payment: RecurringPayment | null;
@@ -292,6 +298,7 @@ function PaymentModal({
   houseId: string;
   members: MemberWithSplit[];
   recurringCats: Category[];
+  salaryEnabled: boolean;
   onClose: () => void;
   onSave: () => void;
   onDelete?: (id: string) => void;
@@ -323,7 +330,7 @@ function PaymentModal({
       setPaymentMethod(payment.paymentMethod ?? 'Card');
     } else {
       setName(''); setDueDate(''); setType(recurringCats[0]?.name ?? '');
-      setAmount(''); setSplitMethod('Salary %');
+      setAmount(''); setSplitMethod(salaryEnabled ? 'Salary %' : '50/50');
       setPayCustom(members.map(() => ''));
       setPaidAmounts(members.map(() => ''));
       setPaidFlags(members.map(() => false));
@@ -413,8 +420,36 @@ function PaymentModal({
         <MLabel text="Name" />
         <TextInput style={styles.mInput} value={name} onChangeText={setName} placeholder="e.g. House Mortgage" placeholderTextColor={Colors.textMuted} />
 
-        <MLabel text="Due Date" />
-        <TextInput style={styles.mInput} value={dueDate} onChangeText={setDueDate} placeholder="e.g. 2nd, MONTHLY, YEARLY" placeholderTextColor={Colors.textMuted} />
+        {/* Due Date + Payment Method */}
+        <View style={styles.inlineRow}>
+          <View style={[styles.inlineCol, { flex: 0.5 }]}>
+            <MLabel text="Due Date" />
+            <TextInput style={styles.mInput} value={dueDate} onChangeText={setDueDate} placeholder="e.g. 2nd" placeholderTextColor={Colors.textMuted} />
+          </View>
+          <View style={styles.inlineCol}>
+            <MLabel text="Payment Method" />
+            <View style={styles.splitMethodRow}>
+              {([
+                { label: 'Cash',    value: 'Cash' as PaymentMethod,    icon: 'cash-outline' },
+                { label: 'Card',    value: 'Card' as PaymentMethod,    icon: 'card-outline' },
+                { label: 'Account', value: 'Account' as PaymentMethod, icon: 'wallet-outline' },
+              ]).map((opt) => {
+                const active = paymentMethod === opt.value;
+                return (
+                  <TouchableOpacity
+                    key={opt.value}
+                    style={[styles.splitMethodBtn, active && styles.splitMethodBtnActive]}
+                    onPress={() => setPaymentMethod(opt.value)}
+                    activeOpacity={0.75}
+                  >
+                    <Ionicons name={opt.icon as any} size={12} color={active ? '#fff' : Colors.textSecondary} />
+                    <Text style={[styles.splitMethodTextSm, active && styles.splitMethodTextActive]}>{opt.label}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </View>
+        </View>
 
         <MLabel text="Type" />
         {recurringCats.length === 0 ? (
@@ -444,57 +479,40 @@ function PaymentModal({
           </View>
         )}
 
-        <MLabel text="Full Amount ($)" />
-        <TextInput
-          style={[styles.mInput, { textAlign: 'center', fontSize: 16, fontWeight: '700' }]}
-          value={amount}
-          onChangeText={handleAmountChange}
-          keyboardType="decimal-pad"
-          placeholder="0.00"
-          placeholderTextColor={Colors.textMuted}
-        />
-
-        {/* Payment Method */}
-        <MLabel text="Payment Method" />
-        <View style={styles.splitMethodRow}>
-          {([
-            { label: 'Cash',    value: 'Cash' as PaymentMethod,    icon: 'cash-outline' },
-            { label: 'Card',    value: 'Card' as PaymentMethod,    icon: 'card-outline' },
-            { label: 'Account', value: 'Account' as PaymentMethod, icon: 'wallet-outline' },
-          ]).map((opt) => {
-            const active = paymentMethod === opt.value;
-            return (
-              <TouchableOpacity
-                key={opt.value}
-                style={[styles.splitMethodBtn, active && styles.splitMethodBtnActive]}
-                onPress={() => setPaymentMethod(opt.value)}
-                activeOpacity={0.75}
-              >
-                <Ionicons name={opt.icon as any} size={14} color={active ? '#fff' : Colors.textSecondary} />
-                <Text style={[styles.splitMethodText, active && styles.splitMethodTextActive]}>{opt.label}</Text>
-              </TouchableOpacity>
-            );
-          })}
-        </View>
-
-        {/* Split Method selector */}
-        <MLabel text="Split Method" />
-        <View style={styles.splitMethodRow}>
-          {(['Salary %', '50/50', 'Custom'] as SplitMethod[]).map((m) => {
-            const active = splitMethod === m;
-            const icon = m === 'Salary %' ? 'analytics-outline' : m === '50/50' ? 'git-branch-outline' : 'create-outline';
-            return (
-              <TouchableOpacity
-                key={m}
-                style={[styles.splitMethodBtn, active && styles.splitMethodBtnActive]}
-                onPress={() => handleSplitMethodChange(m)}
-                activeOpacity={0.75}
-              >
-                <Ionicons name={icon} size={14} color={active ? '#fff' : Colors.textSecondary} />
-                <Text style={[styles.splitMethodText, active && styles.splitMethodTextActive]}>{m}</Text>
-              </TouchableOpacity>
-            );
-          })}
+        {/* Amount + Split Method */}
+        <View style={styles.inlineRow}>
+          <View style={[styles.inlineCol, { flex: 0.5 }]}>
+            <MLabel text="Amount ($)" />
+            <TextInput
+              style={[styles.mInput, { textAlign: 'center', fontSize: 16, fontWeight: '700' }]}
+              value={amount}
+              onChangeText={handleAmountChange}
+              keyboardType="decimal-pad"
+              placeholder="0.00"
+              placeholderTextColor={Colors.textMuted}
+            />
+          </View>
+          <View style={styles.inlineCol}>
+            <MLabel text="Split Method" />
+            <View style={styles.splitMethodRow}>
+              {(['Salary %', '50/50', 'Custom'] as SplitMethod[]).map((m) => {
+                const active = splitMethod === m;
+                const disabled = m === 'Salary %' && !salaryEnabled;
+                const icon = m === 'Salary %' ? 'analytics-outline' : m === '50/50' ? 'git-branch-outline' : 'create-outline';
+                return (
+                  <TouchableOpacity
+                    key={m}
+                    style={[styles.splitMethodBtn, active && styles.splitMethodBtnActive, disabled && { opacity: 0.35 }]}
+                    onPress={() => !disabled && handleSplitMethodChange(m)}
+                    activeOpacity={disabled ? 1 : 0.75}
+                  >
+                    <Ionicons name={icon} size={12} color={active ? '#fff' : Colors.textSecondary} />
+                    <Text style={[styles.splitMethodTextSm, active && styles.splitMethodTextActive]}>{m}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </View>
         </View>
         <Text style={styles.splitHint}>{splitHint}</Text>
 
@@ -661,11 +679,14 @@ const styles = StyleSheet.create({
   typeChip: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 20, borderWidth: 1, borderColor: Colors.border, backgroundColor: Colors.card },
   typeChipText: { fontSize: 13, color: Colors.textSecondary },
   typeFlag: { width: 16, height: 16, borderRadius: 4, alignItems: 'center', justifyContent: 'center' },
+  inlineRow: { flexDirection: 'row', gap: 12, marginTop: 16 },
+  inlineCol: { flex: 1 },
   // Split method
-  splitMethodRow: { flexDirection: 'row', gap: 8 },
-  splitMethodBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, paddingVertical: 11, borderRadius: 12, borderWidth: 1.5, borderColor: Colors.border, backgroundColor: Colors.card },
+  splitMethodRow: { flexDirection: 'row', gap: 5 },
+  splitMethodBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, paddingVertical: 11, borderRadius: 12, borderWidth: 1.5, borderColor: Colors.border, backgroundColor: Colors.card },
   splitMethodBtnActive: { backgroundColor: Colors.primary, borderColor: Colors.primary },
   splitMethodText: { fontSize: 13, fontWeight: '600', color: Colors.textSecondary },
+  splitMethodTextSm: { fontSize: 11, fontWeight: '600', color: Colors.textSecondary },
   splitMethodTextActive: { color: '#fff' },
   splitHint: { fontSize: 11, color: Colors.textMuted, marginTop: 6, marginBottom: 4, textAlign: 'center' },
   // Split pay fields

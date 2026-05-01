@@ -85,8 +85,9 @@ export default function TransactionsScreen() {
     return matchSearch && matchFilter;
   });
 
-  const totalAmt = filtered.reduce((s, t) => s + t.amount, 0);
-  const paidAmt  = filtered.filter(t => t.status === 'P').reduce((s, t) => s + t.amount, 0);
+  const totalAmt  = transactions.reduce((s, t) => s + t.amount, 0);
+  const paidAmt   = transactions.filter(t => t.status === 'P').reduce((s, t) => s + t.amount, 0);
+  const unpaidAmt = transactions.filter(t => t.status === 'NP').reduce((s, t) => s + t.amount, 0);
 
   // Group by date descending
   const dateMap: Record<string, Transaction[]> = {};
@@ -110,6 +111,27 @@ export default function TransactionsScreen() {
           </TouchableOpacity>
         </View>
       <View style={styles.whiteHalf}>
+      {/* Summary card */}
+      <View style={styles.summaryCard}>
+        <View style={styles.summaryHalf}>
+          <Text style={styles.summaryLabel}>Total Expenses</Text>
+          <Text style={[styles.summaryAmount, { color: Colors.danger }]}>{fmt(totalAmt)}</Text>
+          <Text style={styles.summaryMonth}>This Month</Text>
+        </View>
+        <View style={styles.summaryDivider} />
+        <View style={styles.summaryHalf}>
+          <Text style={styles.summaryLabel}>Total Paid</Text>
+          <Text style={[styles.summaryAmount, { color: Colors.success }]}>{fmt(paidAmt)}</Text>
+          <Text style={styles.summaryMonth}>This Month</Text>
+        </View>
+        <View style={styles.summaryDivider} />
+        <View style={styles.summaryHalf}>
+          <Text style={styles.summaryLabel}>Unpaid</Text>
+          <Text style={[styles.summaryAmount, { color: Colors.warning }]}>{fmt(unpaidAmt)}</Text>
+          <Text style={styles.summaryMonth}>This Month</Text>
+        </View>
+      </View>
+
       {/* Search */}
       <View style={styles.searchWrap}>
         <Ionicons name="search" size={16} color={Colors.textMuted} style={{ marginRight: 8 }} />
@@ -144,21 +166,6 @@ export default function TransactionsScreen() {
         contentContainerStyle={styles.content}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => load(true)} />}
       >
-        {/* Summary card */}
-        <View style={styles.summaryCard}>
-          <View style={styles.summaryHalf}>
-            <Text style={styles.summaryLabel}>Total Expenses</Text>
-            <Text style={[styles.summaryAmount, { color: Colors.danger }]}>-{fmt(totalAmt)}</Text>
-            <Text style={styles.summaryMonth}>This Month</Text>
-          </View>
-          <View style={styles.summaryDivider} />
-          <View style={styles.summaryHalf}>
-            <Text style={styles.summaryLabel}>Total Paid</Text>
-            <Text style={[styles.summaryAmount, { color: Colors.success }]}>+{fmt(paidAmt)}</Text>
-            <Text style={styles.summaryMonth}>This Month</Text>
-          </View>
-        </View>
-
         {/* Date-grouped sections */}
         {sections.length === 0 ? (
           <View style={styles.empty}>
@@ -250,12 +257,12 @@ const styles = StyleSheet.create({
 
   content: { padding: 16, paddingBottom: 100 },
 
-  summaryCard:    { flexDirection: 'row', backgroundColor: Colors.card, borderRadius: 16, padding: 16, marginBottom: 20, shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 8, elevation: 3 },
+  summaryCard:    { flexDirection: 'row', backgroundColor: Colors.card, borderRadius: 16, padding: 12, marginHorizontal: 16, marginTop: 12, marginBottom: 8, shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 8, elevation: 3 },
   summaryHalf:    { flex: 1 },
-  summaryDivider: { width: 1, backgroundColor: Colors.border, marginHorizontal: 14 },
-  summaryLabel:   { fontSize: 12, color: Colors.textSecondary, marginBottom: 6 },
-  summaryAmount:  { fontSize: 22, fontWeight: '800', marginBottom: 4 },
-  summaryMonth:   { fontSize: 11, color: Colors.textMuted },
+  summaryDivider: { width: 1, backgroundColor: Colors.border, marginHorizontal: 10 },
+  summaryLabel:   { fontSize: 10, color: Colors.textSecondary, marginBottom: 4 },
+  summaryAmount:  { fontSize: 15, fontWeight: '800', marginBottom: 2 },
+  summaryMonth:   { fontSize: 9, color: Colors.textMuted },
 
   section:       { marginBottom: 16 },
   sectionHeader: { fontSize: 15, fontWeight: '700', color: Colors.textPrimary, marginBottom: 8 },

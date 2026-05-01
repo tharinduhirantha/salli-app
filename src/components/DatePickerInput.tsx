@@ -51,7 +51,7 @@ export default function DatePickerInput({ value, onChange, label }: Props) {
             onChange={(e: any) => onChange(e.target.value)}
             style={{
               flex: 1, border: 'none', background: 'transparent',
-              fontSize: 15, color: Colors.textPrimary, fontWeight: '500',
+              fontSize: 13, color: Colors.textPrimary, fontWeight: '500',
               outline: 'none', cursor: 'pointer', width: '100%',
             }}
           />
@@ -124,7 +124,7 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: Colors.primary + '60',
     paddingHorizontal: 14, paddingVertical: 13,
   },
-  triggerText: { flex: 1, fontSize: 15, color: Colors.textPrimary, fontWeight: '500' },
+  triggerText: { flex: 1, fontSize: 13, color: Colors.textPrimary, fontWeight: '500' },
   overlay: {
     flex: 1, backgroundColor: 'rgba(0,0,0,0.4)',
     justifyContent: 'flex-end',

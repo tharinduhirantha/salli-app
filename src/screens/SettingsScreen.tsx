@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Linking } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../utils/theme';
@@ -78,6 +78,15 @@ export default function SettingsScreen() {
           <Ionicons name="chevron-forward" size={16} color={Colors.textMuted} />
         </TouchableOpacity>
 
+        <TouchableOpacity style={s.contactBtn} onPress={() => Linking.openURL('mailto:contact@salli.online')}>
+          <Ionicons name="mail-outline" size={18} color={Colors.textSecondary} />
+          <View style={{ flex: 1 }}>
+            <Text style={s.contactTitle}>Contact Us</Text>
+            <Text style={s.contactEmail}>contact@salli.online</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={16} color={Colors.textMuted} />
+        </TouchableOpacity>
+
         <TouchableOpacity style={s.signOutBtn} onPress={() => supabase.auth.signOut()}>
           <Ionicons name="log-out-outline" size={18} color={Colors.danger} />
           <Text style={s.signOutText}>Sign Out</Text>
@@ -104,6 +113,9 @@ const s = StyleSheet.create({
   menuDesc:      { fontSize: 12, color: Colors.textMuted },
   guideBtn:      { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: Colors.card, borderRadius: 14, paddingVertical: 14, paddingHorizontal: 16, marginTop: 16, borderWidth: 1, borderColor: Colors.border },
   guideBtnText:  { flex: 1, fontSize: 15, fontWeight: '600', color: Colors.primary },
+  contactBtn:    { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: Colors.card, borderRadius: 14, paddingVertical: 14, paddingHorizontal: 16, marginTop: 12, borderWidth: 1, borderColor: Colors.border },
+  contactTitle:  { fontSize: 15, fontWeight: '600', color: Colors.textPrimary },
+  contactEmail:  { fontSize: 12, color: Colors.textMuted, marginTop: 1 },
   signOutBtn:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderWidth: 1, borderColor: Colors.danger, borderRadius: 14, paddingVertical: 14, marginTop: 12 },
   signOutText:   { fontSize: 15, fontWeight: '600', color: Colors.danger },
   version:       { textAlign: 'center', fontSize: 12, color: Colors.textMuted, marginTop: 16 },
