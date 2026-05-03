@@ -29,6 +29,13 @@ const MENU_ITEMS = [
     title: 'Categories',
     desc: 'Manage expense categories',
   },
+  {
+    screen: 'Merchants',
+    icon: 'storefront-outline' as const,
+    color: Colors.navy,
+    title: 'Merchants',
+    desc: 'Manage your house merchants',
+  },
 ];
 
 export default function SettingsScreen() {

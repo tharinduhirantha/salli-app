@@ -285,7 +285,7 @@ export default function SettingsProfileScreen() {
             <Text style={[s.fieldLabel, { marginTop: 16 }]}>JOIN WITH INVITE CODE</Text>
             <View style={s.inlineRow}>
               <TextInput
-                style={[s.input, s.codeInputSmall, { flex: 1 }]}
+                style={[s.input, s.codeInputSmall, { flex: 1, minWidth: 0 }]}
                 value={joinCodeInput}
                 onChangeText={t => setJoinCodeInput(t.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6))}
                 placeholder="ABC123"

@@ -20,11 +20,13 @@ import TransactionsScreen from '../screens/TransactionsScreen';
 import AddExpenseScreen from '../screens/AddExpenseScreen';
 import FixedPaymentsScreen from '../screens/FixedPaymentsScreen';
 import YearlyScreen from '../screens/YearlyScreen';
+import InsightsScreen from '../screens/InsightsScreen';
 import PersonalExpensesScreen from '../screens/PersonalExpensesScreen';
 import SettingsScreen from '../screens/SettingsScreen';
 import SettingsProfileScreen from '../screens/SettingsProfileScreen';
 import SettingsSalaryScreen from '../screens/SettingsSalaryScreen';
 import SettingsCategoriesScreen from '../screens/SettingsCategoriesScreen';
+import SettingsMerchantsScreen from '../screens/SettingsMerchantsScreen';
 import GuideScreen from '../screens/GuideScreen';
 import AppHeader from '../components/AppHeader';
 import { Colors } from '../utils/theme';
@@ -34,7 +36,7 @@ const SCREEN_SUBTITLES: Record<string, string> = {
   Transactions: 'Track your spending',
   Recurring:    'Manage your recurring payments',
   Status:       'Personal expense tracker',
-  Yearly:       'Annual summary',
+  Insights:     'Your financial health',
 };
 
 const Tab = createBottomTabNavigator();
@@ -45,7 +47,13 @@ const SETTINGS_HEADER_OPTS = {
   headerTintColor: '#FFFFFF' as const,
   headerTitleStyle: { fontWeight: '700' as const, fontSize: 17, color: '#FFFFFF' as const },
   headerBackTitleVisible: false,
-  cardStyle: { backgroundColor: Colors.navy },
+  cardStyle: {
+    backgroundColor: Colors.navy,
+    // On web, CardContent switches to minHeight:'100%' when body fills the screen,
+    // expecting body-level scroll. That breaks inner ScrollViews.
+    // Forcing overflow:'hidden' makes flex children shrink-to-fit, restoring scroll.
+    ...(Platform.OS === 'web' && { flex: 1, overflow: 'hidden' as const }),
+  },
 };
 
 function TransactionsStack() {
@@ -71,7 +79,7 @@ function MainTabs() {
             Transactions: focused ? 'receipt'     : 'receipt-outline',
             Recurring:    focused ? 'card'        : 'card-outline',
             Status:       focused ? 'stats-chart' : 'stats-chart-outline',
-            Yearly:       focused ? 'bar-chart'   : 'bar-chart-outline',
+            Insights:     focused ? 'bulb'         : 'bulb-outline',
           };
           return <Ionicons name={icons[route.name] ?? 'ellipse'} size={size} color={color} />;
         },
@@ -97,7 +105,7 @@ function MainTabs() {
       <Tab.Screen name="Transactions" component={TransactionsStack}      options={{ headerShown: false }} />
       <Tab.Screen name="Recurring"    component={FixedPaymentsScreen}    options={{ title: 'Recurring' }} />
       <Tab.Screen name="Status"       component={PersonalExpensesScreen} options={{ title: 'Status' }} />
-      <Tab.Screen name="Yearly"       component={YearlyScreen}           options={{ title: 'Yearly' }} />
+      <Tab.Screen name="Insights"      component={InsightsScreen}         options={{ title: 'Insights' }} />
     </Tab.Navigator>
   );
 }
@@ -145,6 +153,8 @@ function RootNavigator() {
           <Stack.Screen name="ProfileHousehold" component={SettingsProfileScreen}    options={{ title: 'Profile & Household' }} />
           <Stack.Screen name="SalarySplit"      component={SettingsSalaryScreen}     options={{ title: 'Salary Split' }} />
           <Stack.Screen name="Categories"       component={SettingsCategoriesScreen} options={{ title: 'Categories' }} />
+          <Stack.Screen name="Merchants"        component={SettingsMerchantsScreen}  options={{ title: 'Merchants' }} />
+          <Stack.Screen name="Yearly"           component={YearlyScreen}             options={{ title: 'Yearly Breakdown' }} />
           <Stack.Screen name="Guide"            component={GuideScreen}              options={{ headerShown: false }} />
         </>
       ) : (

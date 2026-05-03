@@ -106,8 +106,8 @@ const GUIDE: GuideItem[] = [
     ],
   },
   {
-    icon: 'bar-chart-outline',
-    title: 'Yearly',
+    icon: 'bulb-outline',
+    title: 'Insights',
     color: '#22C55E',
     sections: [
       {

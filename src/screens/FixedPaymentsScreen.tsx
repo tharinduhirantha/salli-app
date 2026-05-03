@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   View, Text, FlatList, StyleSheet, TouchableOpacity,
-  Modal, TextInput, ScrollView, RefreshControl,
+  Modal, TextInput, ScrollView, RefreshControl, Platform,
 } from 'react-native';
 import { useAlert } from '../context/AlertContext';
 import { useFocusEffect } from '@react-navigation/native';
@@ -142,19 +142,6 @@ export default function FixedPaymentsScreen() {
           </TouchableOpacity>
         </View>
       <View style={styles.whiteHalf}>
-      {/* Summary chips */}
-      <View style={styles.summaryRow}>
-        <SumChip label="Total" value={fmt(totals.amount)} color={Colors.textPrimary} />
-        {membersWithSplit.map((m, i) => (
-          <SumChip
-            key={m.nickname}
-            label={`${m.nickname} Owns`}
-            value={fmt(totals.userTotals[i] ?? 0)}
-            color={USER_COLORS[i] ?? Colors.primary}
-          />
-        ))}
-      </View>
-
       <FlatList
         data={Object.entries(grouped).filter(([, items]) => items.length > 0)}
         keyExtractor={([type]) => type}
@@ -622,7 +609,7 @@ function MLabel({ text }: { text: string }) {
 const styles = StyleSheet.create({
   outer:     { flex: 1 },
   topHalf:   { flex: 1, justifyContent: 'flex-end', zIndex: 2 },
-  whiteHalf: { flex: 1, backgroundColor: Colors.bg, borderTopLeftRadius: 20, borderTopRightRadius: 20, paddingTop: 36, overflow: 'hidden', zIndex: 1 },
+  whiteHalf: { flex: 1, backgroundColor: Colors.bg, borderTopLeftRadius: 20, borderTopRightRadius: 20, paddingTop: 36, overflow: Platform.OS === 'web' ? 'visible' : 'hidden', zIndex: 1 },
   monthCard: { alignSelf: 'center', width: '44%', marginTop: 6, marginBottom: -16, zIndex: 2, backgroundColor: Colors.card, borderRadius: 12, paddingVertical: 5, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOpacity: 0.10, shadowRadius: 8, shadowOffset: { width: 0, height: 2 }, elevation: 6 },
   navBtn: { padding: 6 },
   monthLabel: { fontSize: 14, fontWeight: '700', color: Colors.textPrimary, marginHorizontal: 10 },

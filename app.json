@@ -25,7 +25,16 @@
       "predictiveBackGestureEnabled": false
     },
     "web": {
-      "favicon": "./assets/favicon.png"
+      "favicon": "./assets/favicon.png",
+      "name": "Salli",
+      "shortName": "Salli",
+      "description": "Your household budget companion",
+      "themeColor": "#0D1B3E",
+      "backgroundColor": "#0D1B3E",
+      "display": "standalone",
+      "orientation": "portrait",
+      "startUrl": "/",
+      "scope": "/"
     },
     "plugins": [
       "expo-sqlite",

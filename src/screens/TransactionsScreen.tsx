@@ -1,12 +1,12 @@
 import React, { useCallback, useState } from 'react';
 import {
   View, Text, ScrollView, StyleSheet, TouchableOpacity,
-  RefreshControl, TextInput,
+  RefreshControl, TextInput, Platform,
 } from 'react-native';
 import { useAlert } from '../context/AlertContext';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
-import { getTransactions, deleteTransaction } from '../db/queries';
+import { getTransactions, deleteTransaction, getHouseMembers, HouseMember } from '../db/queries';
 import { useHouse } from '../context/HouseContext';
 import { Transaction } from '../types';
 import { monthLabel } from '../utils/date';
@@ -50,16 +50,22 @@ export default function TransactionsScreen() {
   const { currentHouse, month, goToPrevMonth, goToNextMonth } = useHouse();
   const { showAlert } = useAlert();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [members, setMembers] = useState<HouseMember[]>([]);
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<FilterType>('All');
+  const [ownerFilter, setOwnerFilter] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
   const load = useCallback(async (isRefresh = false) => {
     if (!currentHouse) return;
     if (isRefresh) setRefreshing(true); else setLoading(true);
-    const data = await getTransactions(month, currentHouse.id);
+    const [data, mems] = await Promise.all([
+      getTransactions(month, currentHouse.id),
+      getHouseMembers(currentHouse.id),
+    ]);
     setTransactions(data);
+    setMembers(mems);
     if (isRefresh) setRefreshing(false); else setLoading(false);
   }, [month, currentHouse]);
 
@@ -77,12 +83,15 @@ export default function TransactionsScreen() {
     const q = search.toLowerCase();
     const matchSearch = !q ||
       t.description.toLowerCase().includes(q) ||
-      t.category.toLowerCase().includes(q);
+      t.category.toLowerCase().includes(q) ||
+      t.owner.toLowerCase().includes(q) ||
+      (members.find(m => m.nickname === t.owner)?.fullName.toLowerCase().includes(q) ?? false);
     const matchFilter =
       filter === 'All' ||
       (filter === 'Paid' && t.status === 'P') ||
       (filter === 'Unpaid' && t.status === 'NP');
-    return matchSearch && matchFilter;
+    const matchOwner = !ownerFilter || t.owner === ownerFilter;
+    return matchSearch && matchFilter && matchOwner;
   });
 
   const totalAmt  = transactions.reduce((s, t) => s + t.amount, 0);
@@ -111,56 +120,56 @@ export default function TransactionsScreen() {
           </TouchableOpacity>
         </View>
       <View style={styles.whiteHalf}>
-      {/* Summary card */}
-      <View style={styles.summaryCard}>
-        <View style={styles.summaryHalf}>
-          <Text style={styles.summaryLabel}>Total Expenses</Text>
-          <Text style={[styles.summaryAmount, { color: Colors.danger }]}>{fmt(totalAmt)}</Text>
-          <Text style={styles.summaryMonth}>This Month</Text>
+      {/* Search + Filter row */}
+      <View style={styles.searchFilterRow}>
+        <View style={styles.searchWrap}>
+          <Ionicons name="search" size={16} color={Colors.textMuted} style={{ marginRight: 8 }} />
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Search..."
+            value={search}
+            onChangeText={setSearch}
+            placeholderTextColor={Colors.textMuted}
+          />
+          {!!search && (
+            <TouchableOpacity onPress={() => setSearch('')}>
+              <Ionicons name="close-circle" size={16} color={Colors.textMuted} />
+            </TouchableOpacity>
+          )}
         </View>
-        <View style={styles.summaryDivider} />
-        <View style={styles.summaryHalf}>
-          <Text style={styles.summaryLabel}>Total Paid</Text>
-          <Text style={[styles.summaryAmount, { color: Colors.success }]}>{fmt(paidAmt)}</Text>
-          <Text style={styles.summaryMonth}>This Month</Text>
-        </View>
-        <View style={styles.summaryDivider} />
-        <View style={styles.summaryHalf}>
-          <Text style={styles.summaryLabel}>Unpaid</Text>
-          <Text style={[styles.summaryAmount, { color: Colors.warning }]}>{fmt(unpaidAmt)}</Text>
-          <Text style={styles.summaryMonth}>This Month</Text>
+        <View style={styles.filterRow}>
+          {(['All', 'Paid', 'Unpaid'] as FilterType[]).map(f => (
+            <TouchableOpacity
+              key={f}
+              style={[styles.filterChip, filter === f && styles.filterChipActive]}
+              onPress={() => setFilter(f)}
+            >
+              <Text style={[styles.filterChipText, filter === f && styles.filterChipTextActive]}>{f}</Text>
+            </TouchableOpacity>
+          ))}
         </View>
       </View>
 
-      {/* Search */}
-      <View style={styles.searchWrap}>
-        <Ionicons name="search" size={16} color={Colors.textMuted} style={{ marginRight: 8 }} />
-        <TextInput
-          style={styles.searchInput}
-          placeholder="Search transactions..."
-          value={search}
-          onChangeText={setSearch}
-          placeholderTextColor={Colors.textMuted}
-        />
-        {!!search && (
-          <TouchableOpacity onPress={() => setSearch('')}>
-            <Ionicons name="close-circle" size={16} color={Colors.textMuted} />
-          </TouchableOpacity>
-        )}
-      </View>
-
-      {/* Filter chips */}
-      <View style={styles.filterRow}>
-        {(['All', 'Paid', 'Unpaid'] as FilterType[]).map(f => (
-          <TouchableOpacity
-            key={f}
-            style={[styles.filterChip, filter === f && styles.filterChipActive]}
-            onPress={() => setFilter(f)}
-          >
-            <Text style={[styles.filterChipText, filter === f && styles.filterChipTextActive]}>{f}</Text>
-          </TouchableOpacity>
-        ))}
-      </View>
+      {/* Member filter chips */}
+      {members.length > 1 && (
+        <View style={styles.memberChipRow}>
+          {members.map(m => {
+            const active = ownerFilter === m.nickname;
+            const badge  = memberBadgeColor(m.nickname);
+            return (
+              <TouchableOpacity
+                key={m.nickname}
+                style={[styles.memberChip, active && { backgroundColor: badge.text, borderColor: badge.text }]}
+                onPress={() => setOwnerFilter(active ? null : m.nickname)}
+                activeOpacity={0.75}
+              >
+                <View style={[styles.memberChipDot, { backgroundColor: active ? '#fff' : badge.text }]} />
+                <Text style={[styles.memberChipText, active && { color: '#fff' }]}>{m.nickname}</Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+      )}
 
       <ScrollView
         contentContainerStyle={styles.content}
@@ -241,19 +250,25 @@ export default function TransactionsScreen() {
 const styles = StyleSheet.create({
   outer:      { flex: 1 },
   topHalf:    { flex: 1, justifyContent: 'flex-end', zIndex: 2 },
-  whiteHalf:  { flex: 1, backgroundColor: Colors.bg, borderTopLeftRadius: 20, borderTopRightRadius: 20, paddingTop: 36, overflow: 'hidden', zIndex: 1 },
+  whiteHalf:  { flex: 1, backgroundColor: Colors.bg, borderTopLeftRadius: 20, borderTopRightRadius: 20, paddingTop: 36, overflow: Platform.OS === 'web' ? 'visible' : 'hidden', zIndex: 1 },
   monthCard:  { alignSelf: 'center', width: '44%', marginTop: 6, marginBottom: -16, zIndex: 2, backgroundColor: Colors.card, borderRadius: 12, paddingVertical: 5, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOpacity: 0.10, shadowRadius: 8, shadowOffset: { width: 0, height: 2 }, elevation: 6 },
   navBtn:     { padding: 6 },
   monthLabel: { fontSize: 14, fontWeight: '700', color: Colors.textPrimary, marginHorizontal: 10 },
 
-  searchWrap:  { flexDirection: 'row', alignItems: 'center', marginHorizontal: 16, marginTop: 12, marginBottom: 10, backgroundColor: Colors.card, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 10, borderWidth: 1, borderColor: Colors.border },
-  searchInput: { flex: 1, fontSize: 14, color: Colors.textPrimary },
+  searchFilterRow: { flexDirection: 'row', alignItems: 'center', marginHorizontal: 16, marginTop: 12, marginBottom: 8, gap: 8 },
+  searchWrap:  { flex: 1, flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.card, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 10, borderWidth: 1, borderColor: Colors.border },
+  searchInput: { flex: 1, fontSize: 14, color: Colors.textPrimary, minWidth: 0 },
 
-  filterRow:          { flexDirection: 'row', paddingHorizontal: 16, gap: 8, marginBottom: 4 },
-  filterChip:         { paddingHorizontal: 18, paddingVertical: 8, borderRadius: 20, backgroundColor: Colors.card, borderWidth: 1, borderColor: Colors.border },
+  filterRow:          { flexDirection: 'row', gap: 6 },
+  filterChip:         { paddingHorizontal: 10, paddingVertical: 8, borderRadius: 20, backgroundColor: Colors.card, borderWidth: 1, borderColor: Colors.border },
   filterChipActive:   { backgroundColor: Colors.primary, borderColor: Colors.primary },
-  filterChipText:     { fontSize: 13, fontWeight: '600', color: Colors.textSecondary },
+  filterChipText:     { fontSize: 12, fontWeight: '600', color: Colors.textSecondary },
   filterChipTextActive: { color: '#fff' },
+
+  memberChipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginHorizontal: 16, marginBottom: 8 },
+  memberChip:    { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, backgroundColor: Colors.card, borderWidth: 1, borderColor: Colors.border },
+  memberChipDot: { width: 7, height: 7, borderRadius: 4 },
+  memberChipText:{ fontSize: 12, fontWeight: '600', color: Colors.textSecondary },
 
   content: { padding: 16, paddingBottom: 100 },
 

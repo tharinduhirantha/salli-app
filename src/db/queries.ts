@@ -534,6 +534,35 @@ export async function deleteCategory(id: string): Promise<void> {
   if (error) throw new Error(error.message);
 }
 
+// ─── Merchants ───────────────────────────────────────────────────────────────
+
+export interface Merchant {
+  id: string;
+  name: string;
+}
+
+export async function getMerchants(houseId: string): Promise<Merchant[]> {
+  const { data, error } = await supabase
+    .from('merchants')
+    .select('id, name')
+    .eq('house_id', houseId)
+    .order('name', { ascending: true });
+  if (error) throw new Error(error.message);
+  return (data ?? []).map((r: any) => ({ id: r.id, name: r.name }));
+}
+
+export async function addMerchant(houseId: string, name: string): Promise<void> {
+  const { error } = await supabase
+    .from('merchants')
+    .insert({ house_id: houseId, name: name.trim() });
+  if (error) throw new Error(error.message);
+}
+
+export async function deleteMerchant(id: string): Promise<void> {
+  const { error } = await supabase.from('merchants').delete().eq('id', id);
+  if (error) throw new Error(error.message);
+}
+
 // ─── Transactions ────────────────────────────────────────────────────────────
 
 export async function getTransactions(month: string, houseId: string): Promise<Transaction[]> {
@@ -548,6 +577,7 @@ export async function getTransactions(month: string, houseId: string): Promise<T
     id: r.id, date: r.date, owner: r.owner, category: r.category,
     description: r.description, amount: r.amount, status: r.status, month: r.month,
     paymentMethod: r.payment_method ?? 'Card',
+    merchant: r.merchant ?? undefined,
   }));
 }
 
@@ -557,6 +587,7 @@ export async function addTransaction(t: Omit<Transaction, 'id'>, houseId: string
     description: t.description, amount: t.amount, status: t.status, month: t.month,
     payment_method: t.paymentMethod ?? 'Card',
     house_id: houseId,
+    merchant: t.merchant ?? null,
   };
   let { data, error } = await supabase.from('transactions').insert(payload).select('id').single();
   if (error) {
@@ -572,6 +603,7 @@ export async function updateTransaction(t: Transaction): Promise<void> {
     date: t.date, owner: t.owner, category: t.category,
     description: t.description, amount: t.amount, status: t.status,
     payment_method: t.paymentMethod ?? 'Card',
+    merchant: t.merchant ?? null,
   };
   let { error } = await supabase.from('transactions').update(payload).eq('id', t.id);
   if (error) {
@@ -994,6 +1026,26 @@ export async function getYearlySummary(year: string, houseId: string): Promise<Y
     });
   }
   return rows;
+}
+
+// ─── Yearly Daily Totals (for day-of-week pattern) ──────────────────────────
+
+export async function getYearlyDailyTotals(
+  year: string,
+  houseId: string,
+): Promise<{ date: string; total: number }[]> {
+  const { data } = await supabase
+    .from('transactions')
+    .select('date, amount')
+    .eq('house_id', houseId)
+    .gte('date', `${year}-01-01`)
+    .lte('date', `${year}-12-31`);
+  if (!data) return [];
+  const totals: Record<string, number> = {};
+  (data as { date: string; amount: number }[]).forEach(r => {
+    totals[r.date] = (totals[r.date] ?? 0) + r.amount;
+  });
+  return Object.entries(totals).map(([date, total]) => ({ date, total }));
 }
 
 // ─── Payment Method Totals ───────────────────────────────────────────────────

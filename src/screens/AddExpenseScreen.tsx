@@ -6,7 +6,7 @@ import {
 import { useAlert } from '../context/AlertContext';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
-import { addTransaction, updateTransaction, deleteTransaction, getCategories, getHouseMembers, HouseMember, Category } from '../db/queries';
+import { addTransaction, updateTransaction, deleteTransaction, getCategories, getHouseMembers, getMerchants, HouseMember, Category, Merchant } from '../db/queries';
 import { Transaction, Owner, PayStatus, PaymentMethod } from '../types';
 import { today } from '../utils/date';
 import { Colors, categoryColor } from '../utils/theme';
@@ -27,7 +27,9 @@ export default function AddExpenseScreen() {
 
   const [categories, setCategories] = useState<Category[]>([]);
   const [houseMembers, setHouseMembers] = useState<HouseMember[]>([]);
+  const [merchants, setMerchants] = useState<Merchant[]>([]);
   const [catSearch, setCatSearch] = useState('');
+  const [merchantSearch, setMerchantSearch] = useState('');
   const [date, setDate] = useState(existing?.date ?? (month ? `${month}-01` : today()));
   const [category, setCategory] = useState(existing?.category ?? 'Food');
   const [owner, setOwner] = useState<Owner>(existing?.owner ?? currentUser?.nickname ?? '');
@@ -35,8 +37,10 @@ export default function AddExpenseScreen() {
   const [amount, setAmount] = useState(existing ? String(existing.amount) : '');
   const [status, setStatus] = useState<PayStatus>(existing?.status ?? 'P');
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>(existing?.paymentMethod ?? 'Card');
+  const [merchant, setMerchant] = useState<string>(existing?.merchant ?? '');
   const [saving, setSaving] = useState(false);
   const [catExpanded, setCatExpanded] = useState(false);
+  const [merchantExpanded, setMerchantExpanded] = useState(false);
 
   const isPersonal = category === 'Personal';
 
@@ -48,6 +52,7 @@ export default function AddExpenseScreen() {
     if (!currentHouse) return;
     getCategories(currentHouse.id).then(cats => setCategories(cats.filter(c => !c.isRecurring)));
     getHouseMembers(currentHouse.id).then(setHouseMembers);
+    getMerchants(currentHouse.id).then(setMerchants);
   }, [currentHouse]);
 
   const handleDelete = () => {
@@ -70,9 +75,9 @@ export default function AddExpenseScreen() {
     try {
       const txMonth = date.substring(0, 7);
       if (existing) {
-        await updateTransaction({ ...existing, date, owner, category, description: description.trim(), amount: amt, status, paymentMethod });
+        await updateTransaction({ ...existing, date, owner, category, description: description.trim(), amount: amt, status, paymentMethod, merchant: merchant || undefined });
       } else {
-        await addTransaction({ date, owner, category, description: description.trim(), amount: amt, status, month: txMonth, paymentMethod }, currentHouse!.id);
+        await addTransaction({ date, owner, category, description: description.trim(), amount: amt, status, month: txMonth, paymentMethod, merchant: merchant || undefined }, currentHouse!.id);
       }
       navigation.goBack();
     } catch (e: any) {
@@ -217,35 +222,103 @@ export default function AddExpenseScreen() {
           placeholderTextColor={Colors.textMuted}
         />
 
-        {/* Amount */}
-        <Label text="Amount ($)" />
-        <TextInput
-          style={[styles.input, styles.amountInput]}
-          value={amount}
-          onChangeText={setAmount}
-          keyboardType="decimal-pad"
-          placeholder="0.00"
-          placeholderTextColor={Colors.textMuted}
-        />
-
-
-        {/* Payment Method */}
-        <Label text="Payment Method" />
-        <View style={styles.segmented}>
-          {([
-            { label: 'Cash',    value: 'Cash' as PaymentMethod,    icon: 'cash-outline' },
-            { label: 'Card',    value: 'Card' as PaymentMethod,    icon: 'card-outline' },
-            { label: 'Account', value: 'Account' as PaymentMethod, icon: 'wallet-outline' },
-          ]).map((opt) => (
-            <TouchableOpacity
-              key={opt.value}
-              style={[styles.segment, paymentMethod === opt.value && styles.segmentActive, paymentMethod === opt.value && { backgroundColor: Colors.primary }]}
-              onPress={() => setPaymentMethod(opt.value)}
-            >
-              <Ionicons name={opt.icon as any} size={14} color={paymentMethod === opt.value ? '#fff' : Colors.textSecondary} />
-              <Text style={[styles.segmentText, paymentMethod === opt.value && styles.segmentTextActive]}>{opt.label}</Text>
+        {/* Merchant (optional) */}
+        <Label text="Merchant (optional)" />
+        <TouchableOpacity
+          style={[styles.catSelector, { borderColor: merchantExpanded ? Colors.primary : Colors.border }]}
+          onPress={() => { setMerchantExpanded(e => !e); setMerchantSearch(''); }}
+          activeOpacity={0.8}
+        >
+          <Ionicons name="storefront-outline" size={15} color={merchant ? Colors.primary : Colors.textMuted} />
+          <Text style={[styles.catSelectorText, { color: merchant ? Colors.textPrimary : Colors.textMuted }]} numberOfLines={1}>
+            {merchant || 'Select merchant…'}
+          </Text>
+          {merchant ? (
+            <TouchableOpacity onPress={() => { setMerchant(''); setMerchantExpanded(false); }}>
+              <Ionicons name="close-circle" size={16} color={Colors.textMuted} />
             </TouchableOpacity>
-          ))}
+          ) : (
+            <Ionicons name={merchantExpanded ? 'chevron-up' : 'chevron-down'} size={13} color={Colors.textMuted} />
+          )}
+        </TouchableOpacity>
+        {merchantExpanded && (
+          <View style={styles.catPanel}>
+            <View style={styles.catSearchWrap}>
+              <Ionicons name="search-outline" size={14} color={Colors.textMuted} />
+              <TextInput
+                style={styles.catSearchInput}
+                value={merchantSearch}
+                onChangeText={setMerchantSearch}
+                placeholder="Search merchants…"
+                placeholderTextColor={Colors.textMuted}
+                autoFocus
+              />
+              {!!merchantSearch && (
+                <TouchableOpacity onPress={() => setMerchantSearch('')}>
+                  <Ionicons name="close-circle" size={14} color={Colors.textMuted} />
+                </TouchableOpacity>
+              )}
+            </View>
+            <View style={styles.catDropdown}>
+              {merchants
+                .filter(m => !merchantSearch || m.name.toLowerCase().includes(merchantSearch.toLowerCase()))
+                .map(m => (
+                  <TouchableOpacity
+                    key={m.id}
+                    style={[styles.catDropRow, merchant === m.name && { backgroundColor: Colors.primaryLight }]}
+                    onPress={() => { setMerchant(m.name); setMerchantExpanded(false); setMerchantSearch(''); }}
+                  >
+                    <View style={[styles.catDropIcon, { backgroundColor: Colors.primaryLight }]}>
+                      <Ionicons name="storefront-outline" size={14} color={Colors.primary} />
+                    </View>
+                    <Text style={[styles.catDropText, merchant === m.name && { color: Colors.primary, fontWeight: '700' }]}>{m.name}</Text>
+                    {merchant === m.name && <Ionicons name="checkmark" size={14} color={Colors.primary} />}
+                  </TouchableOpacity>
+                ))}
+              {merchants.filter(m => !merchantSearch || m.name.toLowerCase().includes(merchantSearch.toLowerCase())).length === 0 && (
+                <View style={[styles.catDropRow, { justifyContent: 'center' }]}>
+                  <Text style={{ fontSize: 13, color: Colors.textMuted }}>No merchants found</Text>
+                </View>
+              )}
+            </View>
+          </View>
+        )}
+
+        {/* Amount + Payment Method */}
+        <View style={styles.inlineRow}>
+          <View style={styles.inlineCol}>
+            <Label text="Amount ($)" />
+            <TextInput
+              style={[styles.input, styles.amountInput]}
+              value={amount}
+              onChangeText={setAmount}
+              keyboardType="decimal-pad"
+              placeholder="0.00"
+              placeholderTextColor={Colors.textMuted}
+            />
+          </View>
+          <View style={styles.inlineCol}>
+            <Label text="Method" />
+            <View style={styles.methodRow}>
+              {([
+                { label: 'Cash',    value: 'Cash' as PaymentMethod,    icon: 'cash-outline' },
+                { label: 'Card',    value: 'Card' as PaymentMethod,    icon: 'card-outline' },
+                { label: 'Account', value: 'Account' as PaymentMethod, icon: 'wallet-outline' },
+              ]).map((opt) => {
+                const active = paymentMethod === opt.value;
+                return (
+                  <TouchableOpacity
+                    key={opt.value}
+                    style={[styles.methodBtn, active && styles.methodBtnActive]}
+                    onPress={() => setPaymentMethod(opt.value)}
+                  >
+                    <Ionicons name={opt.icon as any} size={13} color={active ? '#fff' : Colors.textSecondary} />
+                    <Text style={[styles.methodBtnText, active && styles.methodBtnTextActive]} numberOfLines={1}>{opt.label}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </View>
         </View>
 
         <TouchableOpacity style={[styles.saveBtn, saving && { opacity: 0.7 }]} onPress={handleSave} disabled={saving}>
@@ -274,7 +347,12 @@ const styles = StyleSheet.create({
   content: { padding: 16, paddingBottom: 40 },
   label: { fontSize: 11, fontWeight: '600', color: Colors.textSecondary, marginBottom: 6, marginTop: 16, textTransform: 'uppercase', letterSpacing: 0.5 },
   input: { backgroundColor: Colors.card, borderRadius: 12, borderWidth: 1, borderColor: Colors.border, paddingHorizontal: 14, paddingVertical: 12, fontSize: 15, color: Colors.textPrimary },
-  amountInput: { fontSize: 22, fontWeight: '700', textAlign: 'center', paddingVertical: 16 },
+  amountInput: { fontSize: 14, fontWeight: '700', textAlign: 'center', paddingVertical: 9 },
+  methodRow: { flexDirection: 'row', gap: 5 },
+  methodBtn: { flex: 1, flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 3, paddingVertical: 8, borderRadius: 10, borderWidth: 1, borderColor: Colors.border, backgroundColor: Colors.card },
+  methodBtnActive: { backgroundColor: Colors.primary, borderColor: Colors.primary },
+  methodBtnText: { fontSize: 9, fontWeight: '600', color: Colors.textSecondary },
+  methodBtnTextActive: { color: '#fff' },
   inlineRow: { flexDirection: 'row', gap: 12, marginTop: 16 },
   inlineCol: { flex: 1 },
   segmented: { flexDirection: 'row', gap: 6 },

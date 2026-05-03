@@ -21,6 +21,7 @@ export interface Transaction {
   status: PayStatus;
   month: string;
   paymentMethod: PaymentMethod;
+  merchant?: string;
 }
 
 export interface RecurringPaymentShare {
