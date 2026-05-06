@@ -540,14 +540,21 @@ function PaymentModal({
         <View style={styles.inlineRow}>
           <View style={[styles.inlineCol, { flex: 0.5 }]}>
             <MLabel text="Amount ($)" />
-            <TextInput
-              style={[styles.mInput, { textAlign: 'center', fontSize: 16, fontWeight: '700' }]}
-              value={amount}
-              onChangeText={handleAmountChange}
-              keyboardType="decimal-pad"
-              placeholder="0.00"
-              placeholderTextColor={Colors.textMuted}
-            />
+            <View style={[styles.mInput, { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 0, paddingVertical: 0 }]}>
+              <TextInput
+                style={{ flex: 1, textAlign: 'center', fontSize: 16, fontWeight: '700', color: Colors.textPrimary, paddingHorizontal: 14, paddingVertical: 12 }}
+                value={amount}
+                onChangeText={handleAmountChange}
+                keyboardType="decimal-pad"
+                placeholder="0.00"
+                placeholderTextColor={Colors.textMuted}
+              />
+              {!!amount && (
+                <TouchableOpacity onPress={() => handleAmountChange('')} style={{ paddingRight: 10 }}>
+                  <Ionicons name="close-circle" size={16} color={Colors.textMuted} />
+                </TouchableOpacity>
+              )}
+            </View>
           </View>
           <View style={styles.inlineCol}>
             <MLabel text="Split Method" />
@@ -617,15 +624,22 @@ function PaymentModal({
                     <View style={[styles.payStatusBadge, { backgroundColor: color + '22' }]}>
                       <Text style={[styles.payStatusNick, { color }]}>{m.nickname}</Text>
                     </View>
-                    <TextInput
-                      style={[styles.payStatusInput, !amt && styles.payStatusInputDisabled]}
-                      value={paidAmt}
-                      onChangeText={val => { const next = [...paidAmounts]; next[i] = val; setPaidAmounts(next); }}
-                      keyboardType="decimal-pad"
-                      placeholder="Paid amount"
-                      placeholderTextColor={Colors.textMuted}
-                      editable={amt > 0}
-                    />
+                    <View style={[styles.payStatusInput, { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 0, paddingVertical: 0 }, !amt && styles.payStatusInputDisabled]}>
+                      <TextInput
+                        style={{ flex: 1, fontSize: 14, fontWeight: '700', color: Colors.textPrimary, textAlign: 'center', paddingVertical: 7, paddingHorizontal: 10 }}
+                        value={paidAmt}
+                        onChangeText={val => { const next = [...paidAmounts]; next[i] = val; setPaidAmounts(next); }}
+                        keyboardType="decimal-pad"
+                        placeholder="Paid amount"
+                        placeholderTextColor={Colors.textMuted}
+                        editable={amt > 0}
+                      />
+                      {!!paidAmt && amt > 0 && (
+                        <TouchableOpacity onPress={() => { const next = [...paidAmounts]; next[i] = ''; setPaidAmounts(next); }} style={{ paddingRight: 8 }}>
+                          <Ionicons name="close-circle" size={14} color={Colors.textMuted} />
+                        </TouchableOpacity>
+                      )}
+                    </View>
                   </View>
                   {/* Row 2: Not Paid / Paid toggle */}
                   <View style={styles.payStatusToggleRow}>
