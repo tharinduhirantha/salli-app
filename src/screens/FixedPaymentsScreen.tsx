@@ -160,7 +160,7 @@ export default function FixedPaymentsScreen() {
         ListHeaderComponent={
           payments.length > 0 ? (
             <View style={styles.summaryCard}>
-              <View style={styles.summaryHeader}>
+              <View style={styles.summaryHeaderSection}>
                 <View style={styles.summaryHeaderLeft}>
                   <Text style={styles.summaryHeaderLabel}>Total Monthly</Text>
                   <Text style={styles.summaryHeaderAmount}>{fmt(totals.amount)}</Text>
@@ -182,8 +182,8 @@ export default function FixedPaymentsScreen() {
                   )}
                 </View>
                 <View style={styles.summaryHeaderDecor}>
-                  <View style={[styles.summaryDecorCircle, { backgroundColor: Colors.primary + '14' }]}>
-                    <Ionicons name="wallet-outline" size={28} color={Colors.primary} style={{ opacity: 0.7 }} />
+                  <View style={styles.summaryDecorCircle}>
+                    <Ionicons name="wallet-outline" size={28} color={Colors.primary} style={{ opacity: 0.6 }} />
                   </View>
                 </View>
               </View>
@@ -780,8 +780,8 @@ const styles = StyleSheet.create({
   sumChipLabel: { fontSize: 11, marginBottom: 2 },
   sumChipValue: { fontSize: 14, fontWeight: '700' },
   list: { paddingHorizontal: 12, paddingBottom: 100, paddingTop: 8 },
-  summaryCard:             { backgroundColor: Colors.primaryLight, borderRadius: 20, padding: 18, marginBottom: 16, shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 12, elevation: 4 },
-  summaryHeader:           { flexDirection: 'row', alignItems: 'center', marginBottom: 16 },
+  summaryCard:             { backgroundColor: Colors.card, borderRadius: 20, marginBottom: 16, shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 12, elevation: 4, borderWidth: 1, borderColor: Colors.border, overflow: 'hidden' },
+  summaryHeaderSection:    { flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.primaryLight, padding: 18 },
   summaryHeaderLeft:       { flex: 1, gap: 6 },
   summaryHeaderLabel:      { fontSize: 13, fontWeight: '600', color: Colors.textSecondary },
   summaryHeaderAmount:     { fontSize: 30, fontWeight: '800', color: Colors.textPrimary },
@@ -789,8 +789,8 @@ const styles = StyleSheet.create({
   summaryChangeBadgeText:  { fontSize: 12, fontWeight: '700' },
   summaryChangeBadgeVs:    { fontSize: 11, color: Colors.textMuted, fontWeight: '500' },
   summaryHeaderDecor:      { alignItems: 'center', justifyContent: 'center' },
-  summaryDecorCircle:      { width: 72, height: 72, borderRadius: 36, alignItems: 'center', justifyContent: 'center' },
-  summaryUserRow:       { flexDirection: 'row', backgroundColor: Colors.card, borderRadius: 14, overflow: 'hidden' },
+  summaryDecorCircle:      { width: 72, height: 72, borderRadius: 36, alignItems: 'center', justifyContent: 'center', backgroundColor: Colors.primary + '12' },
+  summaryUserRow:       { flexDirection: 'row' },
   summaryUserCell:      { flex: 1, alignItems: 'center', paddingTop: 14, paddingBottom: 12, paddingHorizontal: 4, gap: 5 },
   summaryUserCellBorder:{ borderLeftWidth: 1, borderLeftColor: Colors.border },
   summaryAvatar:        { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', marginBottom: 2 },
