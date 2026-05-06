@@ -12,7 +12,7 @@ import {
 } from '../db/queries';
 import { useHouse } from '../context/HouseContext';
 import { RecurringPayment, PaymentMethod } from '../types';
-import { monthLabel } from '../utils/date';
+import { monthLabel, prevMonth as calcPrevMonth } from '../utils/date';
 import { Colors, fmt } from '../utils/theme';
 import DatePickerInput from '../components/DatePickerInput';
 
@@ -67,6 +67,7 @@ export default function FixedPaymentsScreen() {
   const [recurringCats, setRecurringCats] = useState<Category[]>([]);
   const [merchants, setMerchants] = useState<Merchant[]>([]);
   const [loading, setLoading] = useState(true);
+  const [prevMonthTotal, setPrevMonthTotal] = useState<number | null>(null);
   const [salaryEnabled, setSalaryEnabled] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
   const [editing, setEditing] = useState<RecurringPayment | null>(null);
@@ -75,13 +76,15 @@ export default function FixedPaymentsScreen() {
   const load = useCallback(async () => {
     if (!currentHouse) return;
     setLoading(true);
-    const [data, m, splitPcts, cats, mercs] = await Promise.all([
+    const [data, prevData, m, splitPcts, cats, mercs] = await Promise.all([
       getRecurringPayments(month, currentHouse.id),
+      getRecurringPayments(calcPrevMonth(month), currentHouse.id),
       getHouseMembers(currentHouse.id),
       getMemberSplitPcts(currentHouse.id, month),
       getCategories(currentHouse.id),
       getMerchants(currentHouse.id),
     ]);
+    setPrevMonthTotal(prevData.reduce((s, p) => s + p.amount, 0));
     setMembers(m);
     const mws: MemberWithSplit[] = m.map(mem => ({
       userId:   mem.userId,
@@ -158,8 +161,31 @@ export default function FixedPaymentsScreen() {
           payments.length > 0 ? (
             <View style={styles.summaryCard}>
               <View style={styles.summaryHeader}>
-                <Text style={styles.summaryHeaderLabel}>Total Monthly</Text>
-                <Text style={styles.summaryHeaderAmount}>{fmt(totals.amount)}</Text>
+                <View style={styles.summaryHeaderLeft}>
+                  <Text style={styles.summaryHeaderLabel}>Total Monthly</Text>
+                  <Text style={styles.summaryHeaderAmount}>{fmt(totals.amount)}</Text>
+                  {prevMonthTotal !== null && prevMonthTotal > 0 && (
+                    <View style={[
+                      styles.summaryChangeBadge,
+                      { backgroundColor: totals.amount >= prevMonthTotal ? Colors.successLight : '#FEF2F2' },
+                    ]}>
+                      <Ionicons
+                        name={totals.amount >= prevMonthTotal ? 'arrow-up' : 'arrow-down'}
+                        size={11}
+                        color={totals.amount >= prevMonthTotal ? Colors.success : Colors.danger}
+                      />
+                      <Text style={[styles.summaryChangeBadgeText, { color: totals.amount >= prevMonthTotal ? Colors.success : Colors.danger }]}>
+                        {Math.abs(Math.round(((totals.amount - prevMonthTotal) / prevMonthTotal) * 1000) / 10)}%
+                      </Text>
+                      <Text style={styles.summaryChangeBadgeVs}>vs {monthLabel(calcPrevMonth(month))}</Text>
+                    </View>
+                  )}
+                </View>
+                <View style={styles.summaryHeaderDecor}>
+                  <View style={[styles.summaryDecorCircle, { backgroundColor: Colors.primary + '14' }]}>
+                    <Ionicons name="wallet-outline" size={28} color={Colors.primary} style={{ opacity: 0.7 }} />
+                  </View>
+                </View>
               </View>
               {membersWithSplit.length > 0 && (
                 <View style={styles.summaryUserRow}>
@@ -754,11 +780,17 @@ const styles = StyleSheet.create({
   sumChipLabel: { fontSize: 11, marginBottom: 2 },
   sumChipValue: { fontSize: 14, fontWeight: '700' },
   list: { paddingHorizontal: 12, paddingBottom: 100, paddingTop: 8 },
-  summaryCard:          { backgroundColor: Colors.card, borderRadius: 20, padding: 18, marginBottom: 16, shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 12, elevation: 4, borderWidth: 1, borderColor: Colors.border },
-  summaryHeader:        { marginBottom: 16 },
-  summaryHeaderLabel:   { fontSize: 13, fontWeight: '600', color: Colors.textMuted },
-  summaryHeaderAmount:  { fontSize: 30, fontWeight: '800', color: Colors.textPrimary, marginTop: 4 },
-  summaryUserRow:       { flexDirection: 'row' },
+  summaryCard:             { backgroundColor: Colors.primaryLight, borderRadius: 20, padding: 18, marginBottom: 16, shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 12, elevation: 4 },
+  summaryHeader:           { flexDirection: 'row', alignItems: 'center', marginBottom: 16 },
+  summaryHeaderLeft:       { flex: 1, gap: 6 },
+  summaryHeaderLabel:      { fontSize: 13, fontWeight: '600', color: Colors.textSecondary },
+  summaryHeaderAmount:     { fontSize: 30, fontWeight: '800', color: Colors.textPrimary },
+  summaryChangeBadge:      { flexDirection: 'row', alignItems: 'center', gap: 3, alignSelf: 'flex-start', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8 },
+  summaryChangeBadgeText:  { fontSize: 12, fontWeight: '700' },
+  summaryChangeBadgeVs:    { fontSize: 11, color: Colors.textMuted, fontWeight: '500' },
+  summaryHeaderDecor:      { alignItems: 'center', justifyContent: 'center' },
+  summaryDecorCircle:      { width: 72, height: 72, borderRadius: 36, alignItems: 'center', justifyContent: 'center' },
+  summaryUserRow:       { flexDirection: 'row', backgroundColor: Colors.card, borderRadius: 14, overflow: 'hidden' },
   summaryUserCell:      { flex: 1, alignItems: 'center', paddingTop: 14, paddingBottom: 12, paddingHorizontal: 4, gap: 5 },
   summaryUserCellBorder:{ borderLeftWidth: 1, borderLeftColor: Colors.border },
   summaryAvatar:        { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', marginBottom: 2 },
