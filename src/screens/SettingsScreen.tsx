@@ -105,7 +105,7 @@ export default function SettingsScreen() {
           <Text style={s.signOutText}>Sign Out</Text>
         </TouchableOpacity>
 
-        <Text style={s.version}>Salli v1.1.9</Text>
+        <Text style={s.version}>Salli v1.2.0</Text>
       </ScrollView>
     </ScreenWrapper>
   );

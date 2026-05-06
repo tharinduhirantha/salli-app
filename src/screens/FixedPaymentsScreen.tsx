@@ -157,32 +157,34 @@ export default function FixedPaymentsScreen() {
         ListHeaderComponent={
           payments.length > 0 ? (
             <View style={styles.summaryCard}>
-              <View style={styles.summaryTotalRow}>
-                <Text style={styles.summaryTotalLabel}>Total Monthly</Text>
-                <Text style={styles.summaryTotalValue}>{fmt(totals.amount)}</Text>
+              <View style={styles.summaryHeader}>
+                <Text style={styles.summaryHeaderLabel}>Total Monthly</Text>
+                <Text style={styles.summaryHeaderAmount}>{fmt(totals.amount)}</Text>
               </View>
               {membersWithSplit.length > 0 && (
-                <View style={styles.summaryUsersRow}>
-                  {membersWithSplit.map((m, i) => (
-                    <View
-                      key={m.userId}
-                      style={[styles.summaryUserCol, i < membersWithSplit.length - 1 && styles.summaryUserColDivider]}
-                    >
-                      <Text style={[styles.summaryUserNick, { color: USER_COLORS[i] ?? Colors.primary }]}>{m.nickname}</Text>
-                      <View style={styles.summaryStatBlock}>
-                        <Text style={styles.summaryStatLabel}>Owns</Text>
-                        <Text style={[styles.summaryStatValue, { color: USER_COLORS[i] ?? Colors.primary }]}>
-                          {fmt(totals.userTotals[i] ?? 0)}
+                <View style={styles.summaryUserRow}>
+                  {membersWithSplit.map((m, i) => {
+                    const color   = USER_COLORS[i] ?? Colors.primary;
+                    const initials = m.nickname.substring(0, 2).toUpperCase();
+                    const owns    = totals.userTotals[i] ?? 0;
+                    const unpaid  = userUnpaid[i] ?? 0;
+                    const pct     = totals.amount > 0 ? (owns / totals.amount) * 100 : 0;
+                    return (
+                      <View key={m.userId} style={[styles.summaryUserCell, i > 0 && styles.summaryUserCellBorder]}>
+                        <View style={[styles.summaryAvatar, { backgroundColor: color }]}>
+                          <Text style={styles.summaryAvatarText}>{initials}</Text>
+                        </View>
+                        <Text style={styles.summaryUserName}>{m.nickname}</Text>
+                        <Text style={styles.summaryUserOwns}>{fmt(owns)}</Text>
+                        <Text style={[styles.summaryUserUnpaid, { color: unpaid > 0 ? Colors.danger : Colors.success }]}>
+                          {unpaid > 0 ? `${fmt(unpaid)} due` : 'Paid ✓'}
                         </Text>
+                        <View style={styles.summaryBarBg}>
+                          <View style={[styles.summaryBarFill, { backgroundColor: color, width: `${Math.min(pct, 100)}%` as any }]} />
+                        </View>
                       </View>
-                      <View style={styles.summaryStatBlock}>
-                        <Text style={styles.summaryStatLabel}>Unpaid</Text>
-                        <Text style={[styles.summaryStatValue, { color: (userUnpaid[i] ?? 0) > 0 ? Colors.danger : Colors.success }]}>
-                          {fmt(userUnpaid[i] ?? 0)}
-                        </Text>
-                      </View>
-                    </View>
-                  ))}
+                    );
+                  })}
                 </View>
               )}
             </View>
@@ -752,17 +754,20 @@ const styles = StyleSheet.create({
   sumChipLabel: { fontSize: 11, marginBottom: 2 },
   sumChipValue: { fontSize: 14, fontWeight: '700' },
   list: { paddingHorizontal: 12, paddingBottom: 100, paddingTop: 8 },
-  summaryCard:           { backgroundColor: '#0F172A', borderRadius: 20, padding: 20, marginBottom: 16, shadowColor: '#000', shadowOpacity: 0.18, shadowRadius: 16, elevation: 6 },
-  summaryTotalRow:       { alignItems: 'center', marginBottom: 18 },
-  summaryTotalLabel:     { fontSize: 11, fontWeight: '600', color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: 0.8 },
-  summaryTotalValue:     { fontSize: 30, fontWeight: '800', color: '#fff', marginTop: 4 },
-  summaryUsersRow:       { flexDirection: 'row' },
-  summaryUserCol:        { flex: 1, alignItems: 'center', gap: 10 },
-  summaryUserColDivider: { borderRightWidth: 1, borderRightColor: 'rgba(255,255,255,0.1)' },
-  summaryUserNick:       { fontSize: 13, fontWeight: '800' },
-  summaryStatBlock:      { alignItems: 'center' },
-  summaryStatLabel:      { fontSize: 10, color: 'rgba(255,255,255,0.45)', textTransform: 'uppercase', letterSpacing: 0.5 },
-  summaryStatValue:      { fontSize: 15, fontWeight: '700', marginTop: 2 },
+  summaryCard:          { backgroundColor: Colors.card, borderRadius: 20, padding: 18, marginBottom: 16, shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 12, elevation: 4, borderWidth: 1, borderColor: Colors.border },
+  summaryHeader:        { marginBottom: 16 },
+  summaryHeaderLabel:   { fontSize: 13, fontWeight: '600', color: Colors.textMuted },
+  summaryHeaderAmount:  { fontSize: 30, fontWeight: '800', color: Colors.textPrimary, marginTop: 4 },
+  summaryUserRow:       { flexDirection: 'row' },
+  summaryUserCell:      { flex: 1, alignItems: 'center', paddingTop: 14, paddingBottom: 12, paddingHorizontal: 4, gap: 5 },
+  summaryUserCellBorder:{ borderLeftWidth: 1, borderLeftColor: Colors.border },
+  summaryAvatar:        { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', marginBottom: 2 },
+  summaryAvatarText:    { fontSize: 14, fontWeight: '800', color: '#fff' },
+  summaryUserName:      { fontSize: 12, fontWeight: '600', color: Colors.textPrimary },
+  summaryUserOwns:      { fontSize: 13, fontWeight: '700', color: Colors.textPrimary },
+  summaryUserUnpaid:    { fontSize: 11, fontWeight: '600' },
+  summaryBarBg:         { width: '60%', height: 3, backgroundColor: Colors.border, borderRadius: 2, marginTop: 4 },
+  summaryBarFill:       { height: 3, borderRadius: 2 },
   empty: { alignItems: 'center', paddingTop: 80 },
   emptyText: { fontSize: 16, color: Colors.textSecondary, marginTop: 12, marginBottom: 16 },
   group: { marginBottom: 12, backgroundColor: Colors.card, borderRadius: 16, overflow: 'hidden', shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 8, elevation: 2 },
