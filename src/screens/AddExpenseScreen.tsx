@@ -212,16 +212,6 @@ export default function AddExpenseScreen() {
           </View>
         </View>
 
-        {/* Description */}
-        <Label text="Description" />
-        <TextInput
-          style={styles.input}
-          value={description}
-          onChangeText={setDescription}
-          placeholder="e.g. HEB groceries"
-          placeholderTextColor={Colors.textMuted}
-        />
-
         {/* Merchant (optional) */}
         <Label text="Merchant (optional)" />
         <TouchableOpacity
@@ -259,30 +249,47 @@ export default function AddExpenseScreen() {
                 </TouchableOpacity>
               )}
             </View>
-            <View style={styles.catDropdown}>
-              {merchants
-                .filter(m => !merchantSearch || m.name.toLowerCase().includes(merchantSearch.toLowerCase()))
-                .map(m => (
-                  <TouchableOpacity
-                    key={m.id}
-                    style={[styles.catDropRow, merchant === m.name && { backgroundColor: Colors.primaryLight }]}
-                    onPress={() => { setMerchant(m.name); setMerchantExpanded(false); setMerchantSearch(''); }}
-                  >
-                    <View style={[styles.catDropIcon, { backgroundColor: Colors.primaryLight }]}>
-                      <Ionicons name="storefront-outline" size={14} color={Colors.primary} />
+            {(() => {
+              const filtered = merchants.filter(m => !merchantSearch || m.name.toLowerCase().includes(merchantSearch.toLowerCase()));
+              return (
+                <ScrollView style={styles.merchantScroll} nestedScrollEnabled keyboardShouldPersistTaps="handled">
+                  {filtered.length === 0 ? (
+                    <View style={[styles.catDropRow, { justifyContent: 'center' }]}>
+                      <Text style={{ fontSize: 13, color: Colors.textMuted }}>No merchants found</Text>
                     </View>
-                    <Text style={[styles.catDropText, merchant === m.name && { color: Colors.primary, fontWeight: '700' }]}>{m.name}</Text>
-                    {merchant === m.name && <Ionicons name="checkmark" size={14} color={Colors.primary} />}
-                  </TouchableOpacity>
-                ))}
-              {merchants.filter(m => !merchantSearch || m.name.toLowerCase().includes(merchantSearch.toLowerCase())).length === 0 && (
-                <View style={[styles.catDropRow, { justifyContent: 'center' }]}>
-                  <Text style={{ fontSize: 13, color: Colors.textMuted }}>No merchants found</Text>
-                </View>
-              )}
-            </View>
+                  ) : filtered.map(m => (
+                    <TouchableOpacity
+                      key={m.id}
+                      style={[styles.catDropRow, merchant === m.name && { backgroundColor: Colors.primaryLight }]}
+                      onPress={() => {
+                        setMerchant(m.name);
+                        if (!description.trim()) setDescription(m.name);
+                        setMerchantExpanded(false);
+                        setMerchantSearch('');
+                      }}
+                    >
+                      <View style={[styles.catDropIcon, { backgroundColor: Colors.primaryLight }]}>
+                        <Ionicons name="storefront-outline" size={14} color={Colors.primary} />
+                      </View>
+                      <Text style={[styles.catDropText, merchant === m.name && { color: Colors.primary, fontWeight: '700' }]}>{m.name}</Text>
+                      {merchant === m.name && <Ionicons name="checkmark" size={14} color={Colors.primary} />}
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              );
+            })()}
           </View>
         )}
+
+        {/* Description */}
+        <Label text="Description" />
+        <TextInput
+          style={styles.input}
+          value={description}
+          onChangeText={setDescription}
+          placeholder="e.g. HEB groceries"
+          placeholderTextColor={Colors.textMuted}
+        />
 
         {/* Amount + Payment Method */}
         <View style={styles.inlineRow}>
@@ -371,6 +378,7 @@ const styles = StyleSheet.create({
   catSearchWrap: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: Colors.bg, borderRadius: 10, borderWidth: 1, borderColor: Colors.border, paddingHorizontal: 10, paddingVertical: 8 },
   catSearchInput: { flex: 1, fontSize: 13, color: Colors.textPrimary },
   catDropdown: { backgroundColor: Colors.bg, borderRadius: 10, borderWidth: 1, borderColor: Colors.border, overflow: 'hidden' },
+  merchantScroll: { maxHeight: 200, backgroundColor: Colors.bg, borderRadius: 10, borderWidth: 1, borderColor: Colors.border, overflow: 'hidden' },
   catDropRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 12, paddingVertical: 10 },
   catDropIcon: { width: 28, height: 28, borderRadius: 7, alignItems: 'center', justifyContent: 'center' },
   catDropText: { flex: 1, fontSize: 13, color: Colors.textPrimary, fontWeight: '500' },
