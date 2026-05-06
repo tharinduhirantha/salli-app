@@ -180,29 +180,15 @@ export default function DashboardScreen() {
     recByCategory[r.type].push(r);
   });
 
-  // Paid groups per user
-  const paidGroupsByUser: PaidGroup[][] = summary.users.map((u) => {
-    const groups: PaidGroup[] = [];
-    const seen: Record<string, number> = {};
-    txns.filter(t => t.category !== 'Personal' && t.owner === u.nickname).forEach(t => {
-      if (seen[t.category] === undefined) {
-        seen[t.category] = groups.length;
-        groups.push({ label: t.category, total: t.amount });
-      } else {
-        groups[seen[t.category]].total += t.amount;
-      }
-    });
-    recRows.forEach(r => {
-      const share = r.amount / Math.max(summary.users.length, 1);
-      if (seen[r.type] === undefined) {
-        seen[r.type] = groups.length;
-        groups.push({ label: r.type, total: share });
-      } else {
-        groups[seen[r.type]].total += share;
-      }
-    });
-    return groups;
-  });
+  // Per-user owns per category — derived from summary.categories which already has correct splits
+  const paidGroupsByUser: PaidGroup[][] = summary.users.map((u) =>
+    summary.categories
+      .map(cat => ({
+        label: cat.label,
+        total: cat.userPays.find(up => up.nickname === u.nickname)?.amount ?? 0,
+      }))
+      .filter(g => g.total > 0)
+  );
 
   const u1Pct = (summary.total > 0 && u1) ? Math.round(u1.share / summary.total * 100) : 50;
   const u2Pct = 100 - u1Pct;
@@ -289,7 +275,7 @@ export default function DashboardScreen() {
                   {/* User 1 */}
                   <TouchableOpacity
                     style={styles.userSide}
-                    onPress={() => setUserPopup({ name: u1.fullName, color: USER_COLORS[0], bgColor: USER_LIGHT[0], groups: paidGroupsByUser[0] ?? [], paid: u1.paid })}
+                    onPress={() => setUserPopup({ name: u1.fullName, color: USER_COLORS[0], bgColor: USER_LIGHT[0], groups: paidGroupsByUser[0] ?? [], paid: u1.share })}
                     activeOpacity={0.75}
                   >
                     <Text style={[styles.userName, { color: USER_COLORS[0] }]} numberOfLines={1}>{u1.fullName}</Text>
@@ -309,7 +295,7 @@ export default function DashboardScreen() {
                   {/* User 2 */}
                   <TouchableOpacity
                     style={[styles.userSide, styles.userSideRight]}
-                    onPress={() => setUserPopup({ name: u2.fullName, color: USER_COLORS[1], bgColor: USER_LIGHT[1], groups: paidGroupsByUser[1] ?? [], paid: u2.paid })}
+                    onPress={() => setUserPopup({ name: u2.fullName, color: USER_COLORS[1], bgColor: USER_LIGHT[1], groups: paidGroupsByUser[1] ?? [], paid: u2.share })}
                     activeOpacity={0.75}
                   >
                     <Text style={[styles.userName, { color: USER_COLORS[1] }]} numberOfLines={1}>{u2.fullName}</Text>
@@ -326,7 +312,7 @@ export default function DashboardScreen() {
                       <TouchableOpacity
                         key={u.nickname}
                         style={styles.multiRow}
-                        onPress={() => setUserPopup({ name: u.fullName, color: USER_COLORS[i], bgColor: USER_LIGHT[i], groups: paidGroupsByUser[i] ?? [], paid: u.paid })}
+                        onPress={() => setUserPopup({ name: u.fullName, color: USER_COLORS[i], bgColor: USER_LIGHT[i], groups: paidGroupsByUser[i] ?? [], paid: u.share })}
                         activeOpacity={0.75}
                       >
                         <View style={[styles.multiDot, { backgroundColor: USER_COLORS[i] }]} />
@@ -583,7 +569,7 @@ function PaidGroupsPopup({ data, onClose }: {
             <View style={[styles.paidPopupBadge, { backgroundColor: bgColor }]}>
               <Text style={[styles.paidPopupName, { color }]}>{name}</Text>
             </View>
-            <Text style={styles.paidPopupTitle}>Paid Breakdown</Text>
+            <Text style={styles.paidPopupTitle}>Owns Breakdown</Text>
             <TouchableOpacity onPress={onClose} style={styles.paidPopupClose}>
               <Ionicons name="close" size={20} color={Colors.textMuted} />
             </TouchableOpacity>
@@ -601,7 +587,7 @@ function PaidGroupsPopup({ data, onClose }: {
             )}
           </ScrollView>
           <View style={[styles.paidPopupFooter, { backgroundColor: bgColor }]}>
-            <Text style={[styles.paidPopupFooterLabel, { color }]}>Total Paid</Text>
+            <Text style={[styles.paidPopupFooterLabel, { color }]}>Total Owns</Text>
             <Text style={[styles.paidPopupFooterAmt, { color }]}>{fmt(paid)}</Text>
           </View>
         </TouchableOpacity>
