@@ -194,7 +194,6 @@ export default function FixedPaymentsScreen() {
                     const initials = m.nickname.substring(0, 2).toUpperCase();
                     const owns    = totals.userTotals[i] ?? 0;
                     const unpaid  = userUnpaid[i] ?? 0;
-                    const pct     = totals.amount > 0 ? (owns / totals.amount) * 100 : 0;
                     return (
                       <View key={m.userId} style={[styles.summaryUserCell, i > 0 && styles.summaryUserCellBorder]}>
                         <View style={[styles.summaryAvatar, { backgroundColor: color }]}>
@@ -205,9 +204,6 @@ export default function FixedPaymentsScreen() {
                         <Text style={[styles.summaryUserUnpaid, { color: unpaid > 0 ? Colors.danger : Colors.success }]}>
                           {unpaid > 0 ? `${fmt(unpaid)} due` : 'Paid ✓'}
                         </Text>
-                        <View style={styles.summaryBarBg}>
-                          <View style={[styles.summaryBarFill, { backgroundColor: color, width: `${Math.min(pct, 100)}%` as any }]} />
-                        </View>
                       </View>
                     );
                   })}
@@ -791,15 +787,13 @@ const styles = StyleSheet.create({
   summaryHeaderDecor:      { alignItems: 'center', justifyContent: 'center' },
   summaryDecorCircle:      { width: 56, height: 56, borderRadius: 28, alignItems: 'center', justifyContent: 'center', backgroundColor: Colors.primary + '18' },
   summaryUserRow:       { flexDirection: 'row' },
-  summaryUserCell:      { flex: 1, alignItems: 'center', paddingTop: 10, paddingBottom: 10, paddingHorizontal: 4, gap: 3 },
+  summaryUserCell:      { flex: 1, alignItems: 'center', paddingTop: 8, paddingBottom: 8, paddingHorizontal: 4, gap: 2 },
   summaryUserCellBorder:{ borderLeftWidth: 1, borderLeftColor: Colors.border },
   summaryAvatar:        { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center', marginBottom: 2 },
   summaryAvatarText:    { fontSize: 11, fontWeight: '800', color: '#fff' },
   summaryUserName:      { fontSize: 11, fontWeight: '600', color: Colors.textPrimary },
   summaryUserOwns:      { fontSize: 12, fontWeight: '700', color: Colors.textPrimary },
   summaryUserUnpaid:    { fontSize: 10, fontWeight: '600' },
-  summaryBarBg:         { width: '60%', height: 3, backgroundColor: Colors.border, borderRadius: 2, marginTop: 2 },
-  summaryBarFill:       { height: 3, borderRadius: 2 },
   empty: { alignItems: 'center', paddingTop: 80 },
   emptyText: { fontSize: 16, color: Colors.textSecondary, marginTop: 12, marginBottom: 16 },
   group: { marginBottom: 12, backgroundColor: Colors.card, borderRadius: 16, overflow: 'hidden', shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 8, elevation: 2 },
