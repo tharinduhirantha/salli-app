@@ -199,7 +199,6 @@ export default function FixedPaymentsScreen() {
                         <View style={[styles.summaryAvatar, { backgroundColor: color }]}>
                           <Text style={styles.summaryAvatarText}>{initials}</Text>
                         </View>
-                        <Text style={styles.summaryUserName}>{m.nickname}</Text>
                         <Text style={styles.summaryUserOwns}>{fmt(owns)}</Text>
                         <Text style={[styles.summaryUserUnpaid, { color: unpaid > 0 ? Colors.danger : Colors.success }]}>
                           {unpaid > 0 ? `${fmt(unpaid)} due` : 'Paid ✓'}
