@@ -318,7 +318,7 @@ function PaymentModal({
       const splitPcts = members.map(m => m.splitPct);
       setSplitMethod(inferSplitMethod(pays, payment.amount, splitPcts));
       setPayCustom(pays.map(String));
-      setPaidAmounts(members.map((_, i) => String(paids[i] > 0 ? paids[i] : pays[i])));
+      setPaidAmounts(members.map((_, i) => String(paids[i])));
       setPaidFlags(members.map(m => payment.userShares.find(s => s.userId === m.userId)?.isPaid ?? false));
       setPaymentMethod(payment.paymentMethod ?? 'Card');
     } else {
