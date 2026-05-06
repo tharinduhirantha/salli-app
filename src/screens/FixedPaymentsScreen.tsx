@@ -545,9 +545,9 @@ function PaymentModal({
         <View style={styles.inlineRow}>
           <View style={[styles.inlineCol, { flex: 0.5 }]}>
             <MLabel text="Amount ($)" />
-            <View style={[styles.mInput, { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 0, paddingVertical: 0 }]}>
+            <View style={styles.clearableWrap}>
               <TextInput
-                style={{ flex: 1, textAlign: 'center', fontSize: 16, fontWeight: '700', color: Colors.textPrimary, paddingHorizontal: 14, paddingVertical: 12 }}
+                style={styles.amountInput}
                 value={amount}
                 onChangeText={handleAmountChange}
                 keyboardType="decimal-pad"
@@ -555,7 +555,7 @@ function PaymentModal({
                 placeholderTextColor={Colors.textMuted}
               />
               {!!amount && (
-                <TouchableOpacity onPress={() => handleAmountChange('')} style={{ paddingRight: 10 }}>
+                <TouchableOpacity onPress={() => handleAmountChange('')} style={styles.clearIconBtn}>
                   <Ionicons name="close-circle" size={16} color={Colors.textMuted} />
                 </TouchableOpacity>
               )}
@@ -629,9 +629,9 @@ function PaymentModal({
                     <View style={[styles.payStatusBadge, { backgroundColor: color + '22' }]}>
                       <Text style={[styles.payStatusNick, { color }]}>{m.nickname}</Text>
                     </View>
-                    <View style={[styles.payStatusInput, { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 0, paddingVertical: 0 }, !amt && styles.payStatusInputDisabled]}>
+                    <View style={[styles.paidInputWrap, !amt && styles.payStatusInputDisabled]}>
                       <TextInput
-                        style={{ flex: 1, fontSize: 14, fontWeight: '700', color: Colors.textPrimary, textAlign: 'center', paddingVertical: 7, paddingHorizontal: 10 }}
+                        style={styles.paidInputInner}
                         value={paidAmt}
                         onChangeText={val => { const next = [...paidAmounts]; next[i] = val; setPaidAmounts(next); }}
                         keyboardType="decimal-pad"
@@ -640,7 +640,7 @@ function PaymentModal({
                         editable={amt > 0}
                       />
                       {!!paidAmt && amt > 0 && (
-                        <TouchableOpacity onPress={() => { const next = [...paidAmounts]; next[i] = ''; setPaidAmounts(next); }} style={{ paddingRight: 8 }}>
+                        <TouchableOpacity onPress={() => { const next = [...paidAmounts]; next[i] = ''; setPaidAmounts(next); }} style={styles.clearIconBtn}>
                           <Ionicons name="close-circle" size={14} color={Colors.textMuted} />
                         </TouchableOpacity>
                       )}
@@ -757,6 +757,11 @@ const styles = StyleSheet.create({
   payStatusToggleBtn:     { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, paddingVertical: 9, borderRadius: 10, borderWidth: 1.5 },
   payStatusToggleBtnText: { fontSize: 13, fontWeight: '700' },
   mInput: { backgroundColor: Colors.card, borderRadius: 12, borderWidth: 1, borderColor: Colors.border, paddingHorizontal: 14, paddingVertical: 12, fontSize: 15, color: Colors.textPrimary },
+  clearableWrap: { flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.card, borderRadius: 12, borderWidth: 1, borderColor: Colors.border, overflow: 'hidden' },
+  amountInput:   { flex: 1, textAlign: 'center', fontSize: 16, fontWeight: '700', color: Colors.textPrimary, paddingHorizontal: 14, paddingVertical: 12 },
+  paidInputWrap: { flex: 1, flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.bg, borderRadius: 9, borderWidth: 1, borderColor: Colors.border, overflow: 'hidden' },
+  paidInputInner: { flex: 1, fontSize: 14, fontWeight: '700', color: Colors.textPrimary, textAlign: 'center', paddingVertical: 7, paddingHorizontal: 10 },
+  clearIconBtn:  { paddingRight: 8 },
   merchantSelector:    { flexDirection: 'row', alignItems: 'center', gap: 7, backgroundColor: Colors.card, borderRadius: 12, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 13 },
   merchantSelectorText: { flex: 1, fontSize: 13, fontWeight: '600' },
   merchantPanel:       { backgroundColor: Colors.card, borderRadius: 14, borderWidth: 1, borderColor: Colors.border, padding: 12, gap: 10, marginTop: 4 },
