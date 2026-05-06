@@ -183,7 +183,7 @@ export default function FixedPaymentsScreen() {
                 </View>
                 <View style={styles.summaryHeaderDecor}>
                   <View style={styles.summaryDecorCircle}>
-                    <Ionicons name="wallet-outline" size={28} color={Colors.primary} style={{ opacity: 0.6 }} />
+                    <Ionicons name="wallet-outline" size={22} color={Colors.primary} style={{ opacity: 0.6 }} />
                   </View>
                 </View>
               </View>
@@ -781,24 +781,24 @@ const styles = StyleSheet.create({
   sumChipValue: { fontSize: 14, fontWeight: '700' },
   list: { paddingHorizontal: 12, paddingBottom: 100, paddingTop: 8 },
   summaryCard:             { backgroundColor: Colors.card, borderRadius: 20, marginBottom: 16, shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 12, elevation: 4, borderWidth: 1, borderColor: Colors.border, overflow: 'hidden' },
-  summaryHeaderSection:    { flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.primaryLight, padding: 18 },
-  summaryHeaderLeft:       { flex: 1, gap: 6 },
-  summaryHeaderLabel:      { fontSize: 13, fontWeight: '600', color: Colors.textSecondary },
-  summaryHeaderAmount:     { fontSize: 30, fontWeight: '800', color: Colors.textPrimary },
-  summaryChangeBadge:      { flexDirection: 'row', alignItems: 'center', gap: 3, alignSelf: 'flex-start', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8 },
-  summaryChangeBadgeText:  { fontSize: 12, fontWeight: '700' },
-  summaryChangeBadgeVs:    { fontSize: 11, color: Colors.textMuted, fontWeight: '500' },
+  summaryHeaderSection:    { flexDirection: 'row', alignItems: 'center', backgroundColor: '#D6DDEF', padding: 14 },
+  summaryHeaderLeft:       { flex: 1, gap: 4 },
+  summaryHeaderLabel:      { fontSize: 12, fontWeight: '600', color: Colors.textSecondary },
+  summaryHeaderAmount:     { fontSize: 22, fontWeight: '800', color: Colors.textPrimary },
+  summaryChangeBadge:      { flexDirection: 'row', alignItems: 'center', gap: 3, alignSelf: 'flex-start', paddingHorizontal: 7, paddingVertical: 3, borderRadius: 8 },
+  summaryChangeBadgeText:  { fontSize: 11, fontWeight: '700' },
+  summaryChangeBadgeVs:    { fontSize: 10, color: Colors.textSecondary, fontWeight: '500' },
   summaryHeaderDecor:      { alignItems: 'center', justifyContent: 'center' },
-  summaryDecorCircle:      { width: 72, height: 72, borderRadius: 36, alignItems: 'center', justifyContent: 'center', backgroundColor: Colors.primary + '12' },
+  summaryDecorCircle:      { width: 56, height: 56, borderRadius: 28, alignItems: 'center', justifyContent: 'center', backgroundColor: Colors.primary + '18' },
   summaryUserRow:       { flexDirection: 'row' },
-  summaryUserCell:      { flex: 1, alignItems: 'center', paddingTop: 14, paddingBottom: 12, paddingHorizontal: 4, gap: 5 },
+  summaryUserCell:      { flex: 1, alignItems: 'center', paddingTop: 10, paddingBottom: 10, paddingHorizontal: 4, gap: 3 },
   summaryUserCellBorder:{ borderLeftWidth: 1, borderLeftColor: Colors.border },
-  summaryAvatar:        { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', marginBottom: 2 },
-  summaryAvatarText:    { fontSize: 14, fontWeight: '800', color: '#fff' },
-  summaryUserName:      { fontSize: 12, fontWeight: '600', color: Colors.textPrimary },
-  summaryUserOwns:      { fontSize: 13, fontWeight: '700', color: Colors.textPrimary },
-  summaryUserUnpaid:    { fontSize: 11, fontWeight: '600' },
-  summaryBarBg:         { width: '60%', height: 3, backgroundColor: Colors.border, borderRadius: 2, marginTop: 4 },
+  summaryAvatar:        { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center', marginBottom: 2 },
+  summaryAvatarText:    { fontSize: 11, fontWeight: '800', color: '#fff' },
+  summaryUserName:      { fontSize: 11, fontWeight: '600', color: Colors.textPrimary },
+  summaryUserOwns:      { fontSize: 12, fontWeight: '700', color: Colors.textPrimary },
+  summaryUserUnpaid:    { fontSize: 10, fontWeight: '600' },
+  summaryBarBg:         { width: '60%', height: 3, backgroundColor: Colors.border, borderRadius: 2, marginTop: 2 },
   summaryBarFill:       { height: 3, borderRadius: 2 },
   empty: { alignItems: 'center', paddingTop: 80 },
   emptyText: { fontSize: 16, color: Colors.textSecondary, marginTop: 12, marginBottom: 16 },
