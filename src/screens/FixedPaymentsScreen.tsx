@@ -370,7 +370,12 @@ function PaymentModal({
       showAlert('Invalid Split', `${parts} = ${fmt(splitTotal)}, but total is ${fmt(amt)}. Split must equal total.`);
       return;
     }
-    const rawVals = members.map((_, i) => parseFloat(paidAmounts[i] ?? '0') || 0);
+    const emptyIdx = members.findIndex((_, i) => (paidAmounts[i] ?? '').trim() === '');
+    if (emptyIdx !== -1) {
+      showAlert('Required', `Paid amount for ${members[emptyIdx].nickname} is required. Enter 0 if unpaid.`);
+      return;
+    }
+    const rawVals = members.map((_, i) => parseFloat(paidAmounts[i]!) || 0);
     const paidTotal = Math.round(rawVals.reduce((s, v) => s + v, 0) * 100) / 100;
     if (Math.abs(paidTotal - amt) > 0.005) {
       const parts = members.map((m, i) => `${m.nickname} ${fmt(rawVals[i] ?? 0)}`).join(' + ');
