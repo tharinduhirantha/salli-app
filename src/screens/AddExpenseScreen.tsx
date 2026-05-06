@@ -123,7 +123,7 @@ export default function AddExpenseScreen() {
         {catExpanded && (
           <View style={styles.catPanel}>
             <View style={styles.catGrid}>
-              {categories.slice(0, 5).map((c) => {
+              {categories.slice(0, 10).map((c) => {
                 const active = category === c.name;
                 const chipColor = categoryColor[c.name] ?? Colors.primary;
                 return (

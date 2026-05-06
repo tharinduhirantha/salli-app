@@ -123,6 +123,37 @@ export default function TransactionsScreen() {
           </TouchableOpacity>
         </View>
       <View style={styles.whiteHalf}>
+      {/* Summary card */}
+      {transactions.length > 0 && (
+        <View style={[styles.txSummaryCard, { marginHorizontal: 12, marginTop: 0, marginBottom: 8 }]}>
+          <View style={styles.txSummaryHeader}>
+            <View style={{ gap: 4 }}>
+              <Text style={styles.txSummaryLabel}>Total Monthly</Text>
+              <Text style={styles.txSummaryAmount}>{fmt(totalAmt)}</Text>
+              {prevMonthTotal !== null && prevMonthTotal > 0 && (
+                <View style={[
+                  styles.txSummaryBadge,
+                  { backgroundColor: totalAmt >= prevMonthTotal ? Colors.successLight : '#FEF2F2' },
+                ]}>
+                  <Ionicons
+                    name={totalAmt >= prevMonthTotal ? 'arrow-up' : 'arrow-down'}
+                    size={11}
+                    color={totalAmt >= prevMonthTotal ? Colors.success : Colors.danger}
+                  />
+                  <Text style={[styles.txSummaryBadgeText, { color: totalAmt >= prevMonthTotal ? Colors.success : Colors.danger }]}>
+                    {Math.abs(Math.round(((totalAmt - prevMonthTotal) / prevMonthTotal) * 1000) / 10)}%
+                  </Text>
+                  <Text style={styles.txSummaryBadgeVs}>vs {monthLabel(calcPrevMonth(month))}</Text>
+                </View>
+              )}
+            </View>
+            <View style={styles.txSummaryDecor}>
+              <Ionicons name="receipt-outline" size={22} color={Colors.primary} style={{ opacity: 0.6 }} />
+            </View>
+          </View>
+        </View>
+      )}
+
       {/* Search + Filter row */}
       <View style={styles.searchFilterRow}>
         <View style={styles.searchWrap}>
@@ -178,37 +209,6 @@ export default function TransactionsScreen() {
         contentContainerStyle={styles.content}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => load(true)} />}
       >
-        {/* Summary card */}
-        {transactions.length > 0 && (
-          <View style={styles.txSummaryCard}>
-            <View style={styles.txSummaryHeader}>
-              <View style={{ gap: 4 }}>
-                <Text style={styles.txSummaryLabel}>Total Monthly</Text>
-                <Text style={styles.txSummaryAmount}>{fmt(totalAmt)}</Text>
-                {prevMonthTotal !== null && prevMonthTotal > 0 && (
-                  <View style={[
-                    styles.txSummaryBadge,
-                    { backgroundColor: totalAmt >= prevMonthTotal ? Colors.successLight : '#FEF2F2' },
-                  ]}>
-                    <Ionicons
-                      name={totalAmt >= prevMonthTotal ? 'arrow-up' : 'arrow-down'}
-                      size={11}
-                      color={totalAmt >= prevMonthTotal ? Colors.success : Colors.danger}
-                    />
-                    <Text style={[styles.txSummaryBadgeText, { color: totalAmt >= prevMonthTotal ? Colors.success : Colors.danger }]}>
-                      {Math.abs(Math.round(((totalAmt - prevMonthTotal) / prevMonthTotal) * 1000) / 10)}%
-                    </Text>
-                    <Text style={styles.txSummaryBadgeVs}>vs {monthLabel(calcPrevMonth(month))}</Text>
-                  </View>
-                )}
-              </View>
-              <View style={styles.txSummaryDecor}>
-                <Ionicons name="receipt-outline" size={22} color={Colors.primary} style={{ opacity: 0.6 }} />
-              </View>
-            </View>
-          </View>
-        )}
-
         {/* Date-grouped sections */}
         {sections.length === 0 ? (
           <View style={styles.empty}>

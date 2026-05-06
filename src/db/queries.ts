@@ -571,7 +571,9 @@ export async function getTransactions(month: string, houseId: string): Promise<T
     .select('*')
     .eq('month', month)
     .eq('house_id', houseId)
-    .order('date', { ascending: false });
+    .order('date', { ascending: false })
+    .order('description', { ascending: true })
+    .order('created_at', { ascending: true });
   if (error) throw new Error(error.message);
   return (data ?? []).map((r: any) => ({
     id: r.id, date: r.date, owner: r.owner, category: r.category,
