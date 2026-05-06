@@ -85,6 +85,12 @@ export default function SettingsScreen() {
           <Ionicons name="chevron-forward" size={16} color={Colors.textMuted} />
         </TouchableOpacity>
 
+        <TouchableOpacity style={s.guideBtn} onPress={() => navigation.navigate('Terms')}>
+          <Ionicons name="document-text-outline" size={18} color={Colors.primary} />
+          <Text style={s.guideBtnText}>Terms &amp; Conditions</Text>
+          <Ionicons name="chevron-forward" size={16} color={Colors.textMuted} />
+        </TouchableOpacity>
+
         <TouchableOpacity style={s.contactBtn} onPress={() => Linking.openURL('mailto:contact@salli.online')}>
           <Ionicons name="mail-outline" size={18} color={Colors.textSecondary} />
           <View style={{ flex: 1 }}>
@@ -99,7 +105,7 @@ export default function SettingsScreen() {
           <Text style={s.signOutText}>Sign Out</Text>
         </TouchableOpacity>
 
-        <Text style={s.version}>Salli v2.0</Text>
+        <Text style={s.version}>Salli v1.1.2</Text>
       </ScrollView>
     </ScreenWrapper>
   );

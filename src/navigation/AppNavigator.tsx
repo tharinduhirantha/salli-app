@@ -28,6 +28,7 @@ import SettingsSalaryScreen from '../screens/SettingsSalaryScreen';
 import SettingsCategoriesScreen from '../screens/SettingsCategoriesScreen';
 import SettingsMerchantsScreen from '../screens/SettingsMerchantsScreen';
 import GuideScreen from '../screens/GuideScreen';
+import TermsScreen from '../screens/TermsScreen';
 import AppHeader from '../components/AppHeader';
 import { Colors } from '../utils/theme';
 
@@ -156,6 +157,7 @@ function RootNavigator() {
           <Stack.Screen name="Merchants"        component={SettingsMerchantsScreen}  options={{ title: 'Merchants' }} />
           <Stack.Screen name="Yearly"           component={YearlyScreen}             options={{ title: 'Yearly Breakdown' }} />
           <Stack.Screen name="Guide"            component={GuideScreen}              options={{ headerShown: false }} />
+          <Stack.Screen name="Terms"            component={TermsScreen}              options={{ headerShown: false }} />
         </>
       ) : (
         <Stack.Screen name="HouseSetup" component={HouseSetupScreen} options={{ headerShown: false }} />

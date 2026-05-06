@@ -35,7 +35,7 @@ export default function AddExpenseScreen() {
   const [owner, setOwner] = useState<Owner>(existing?.owner ?? currentUser?.nickname ?? '');
   const [description, setDescription] = useState(existing?.description ?? '');
   const [amount, setAmount] = useState(existing ? String(existing.amount) : '');
-  const [status, setStatus] = useState<PayStatus>(existing?.status ?? 'P');
+  const [status, setStatus] = useState<PayStatus>(existing?.status ?? 'NP');
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>(existing?.paymentMethod ?? 'Card');
   const [merchant, setMerchant] = useState<string>(existing?.merchant ?? '');
   const [saving, setSaving] = useState(false);

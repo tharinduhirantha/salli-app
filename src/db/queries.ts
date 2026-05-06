@@ -629,7 +629,8 @@ export async function getRecurringPayments(month: string, houseId: string): Prom
     .order('created_at', { ascending: true });
   if (error) throw new Error(error.message);
   return (data ?? []).map((r: any) => ({
-    id: r.id, name: r.name, dueDate: r.due_date, type: r.type,
+    id: r.id, name: r.name, merchant: r.merchant ?? undefined,
+    dueDate: r.due_date, type: r.type,
     amount: r.amount,
     userShares: (r.recurring_payment_shares ?? []).map((s: any) => ({
       userId: s.user_id, pay: s.pay ?? 0, paid: s.paid ?? 0, isPaid: s.is_paid ?? false,
@@ -752,10 +753,12 @@ export async function addRecurringPayment(p: Omit<RecurringPayment, 'id'>, house
     name: p.name, due_date: p.dueDate, type: p.type, amount: p.amount,
     month: p.month, house_id: houseId,
     payment_method: p.paymentMethod ?? 'Card',
+    ...(p.merchant ? { merchant: p.merchant } : {}),
   };
   let { data, error } = await supabase.from('recurring_payments').insert(payload).select('id').single();
   if (error) {
     delete payload.payment_method;
+    delete payload.merchant;
     ({ data, error } = await supabase.from('recurring_payments').insert(payload).select('id').single());
   }
   if (error || !data) throw new Error(error?.message ?? 'Insert failed');
@@ -773,10 +776,12 @@ export async function updateRecurringPayment(p: RecurringPayment): Promise<void>
   const payload: any = {
     name: p.name, due_date: p.dueDate, type: p.type, amount: p.amount,
     payment_method: p.paymentMethod ?? 'Card',
+    ...(p.merchant !== undefined ? { merchant: p.merchant || null } : {}),
   };
   let { error } = await supabase.from('recurring_payments').update(payload).eq('id', p.id);
   if (error) {
     delete payload.payment_method;
+    delete payload.merchant;
     ({ error } = await supabase.from('recurring_payments').update(payload).eq('id', p.id));
   }
   if (error) throw new Error(error.message);

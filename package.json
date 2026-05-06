@@ -7,7 +7,10 @@
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
-    "deploy": "npx expo export --platform web && node scripts/patch-web.js && npx netlify-cli deploy --prod --dir=dist"
+    "deploy": "npx expo export --platform web && node scripts/patch-web.js && npx netlify-cli deploy --prod --dir=dist",
+    "deploy:cf": "npx expo export --platform web && node scripts/patch-web.js && npx wrangler pages deploy dist --project-name salli-app --commit-dirty=true",
+    "deploy:dev": "npx expo export --platform web && node scripts/patch-web.js && npx wrangler pages deploy dist --project-name salli-app --branch dev --commit-dirty=true",
+    "deploy:all": "npx expo export --platform web && node scripts/patch-web.js && npx netlify-cli deploy --prod --dir=dist && npx wrangler pages deploy dist --project-name salli-app --commit-dirty=true"
   },
   "dependencies": {
     "@expo/metro-runtime": "~6.1.2",
@@ -37,7 +40,9 @@
   },
   "devDependencies": {
     "@types/react": "~19.1.0",
-    "typescript": "~5.9.2"
+    "playwright": "^1.59.1",
+    "typescript": "~5.9.2",
+    "xlsx": "^0.18.5"
   },
   "private": true
 }

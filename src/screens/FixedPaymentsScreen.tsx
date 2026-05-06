@@ -8,7 +8,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import {
   getRecurringPayments, addRecurringPayment, updateRecurringPayment,
-  deleteRecurringPayment, getHouseMembers, getMemberSplitPcts, getCategories, HouseMember, Category,
+  deleteRecurringPayment, getHouseMembers, getMemberSplitPcts, getCategories, getMerchants, HouseMember, Category, Merchant,
 } from '../db/queries';
 import { useHouse } from '../context/HouseContext';
 import { RecurringPayment, PaymentMethod } from '../types';
@@ -65,6 +65,7 @@ export default function FixedPaymentsScreen() {
   const [members, setMembers] = useState<HouseMember[]>([]);
   const [membersWithSplit, setMembersWithSplit] = useState<MemberWithSplit[]>([]);
   const [recurringCats, setRecurringCats] = useState<Category[]>([]);
+  const [merchants, setMerchants] = useState<Merchant[]>([]);
   const [loading, setLoading] = useState(true);
   const [salaryEnabled, setSalaryEnabled] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
@@ -74,11 +75,12 @@ export default function FixedPaymentsScreen() {
   const load = useCallback(async () => {
     if (!currentHouse) return;
     setLoading(true);
-    const [data, m, splitPcts, cats] = await Promise.all([
+    const [data, m, splitPcts, cats, mercs] = await Promise.all([
       getRecurringPayments(month, currentHouse.id),
       getHouseMembers(currentHouse.id),
-      getMemberSplitPcts(currentHouse.id),
+      getMemberSplitPcts(currentHouse.id, month),
       getCategories(currentHouse.id),
+      getMerchants(currentHouse.id),
     ]);
     setMembers(m);
     const mws: MemberWithSplit[] = m.map(mem => ({
@@ -86,12 +88,10 @@ export default function FixedPaymentsScreen() {
       nickname: mem.nickname,
       splitPct: splitPcts[mem.userId] ?? (100 / (m.length || 1)),
     }));
-    const enabled = m.length >= 2 &&
-      m.every(mem => splitPcts[mem.userId] != null) &&
-      Math.round(m.reduce((s, mem) => s + (splitPcts[mem.userId] ?? 0), 0)) === 100;
-    setSalaryEnabled(enabled);
+    setSalaryEnabled(m.length >= 2);
     setMembersWithSplit(mws);
     setRecurringCats(cats.filter(c => c.isRecurring));
+    setMerchants(mercs);
     setPayments(data);
     setLoading(false);
   }, [month, currentHouse]);
@@ -251,6 +251,7 @@ export default function FixedPaymentsScreen() {
         houseId={currentHouse?.id ?? ''}
         members={membersWithSplit}
         recurringCats={recurringCats}
+        merchants={merchants}
         salaryEnabled={salaryEnabled}
         onClose={() => setModalVisible(false)}
         onSave={() => { setModalVisible(false); load(); }}
@@ -277,7 +278,7 @@ function SumChip({ label, value, color }: { label: string; value: string; color:
 }
 
 function PaymentModal({
-  visible, payment, month, houseId, members, recurringCats, salaryEnabled, onClose, onSave, onDelete,
+  visible, payment, month, houseId, members, recurringCats, merchants, salaryEnabled, onClose, onSave, onDelete,
 }: {
   visible: boolean;
   payment: RecurringPayment | null;
@@ -285,6 +286,7 @@ function PaymentModal({
   houseId: string;
   members: MemberWithSplit[];
   recurringCats: Category[];
+  merchants: Merchant[];
   salaryEnabled: boolean;
   onClose: () => void;
   onSave: () => void;
@@ -292,6 +294,9 @@ function PaymentModal({
 }) {
   const { showAlert } = useAlert();
   const [name, setName] = useState('');
+  const [merchant, setMerchant] = useState('');
+  const [merchantSearch, setMerchantSearch] = useState('');
+  const [merchantExpanded, setMerchantExpanded] = useState(false);
   const [dueDate, setDueDate] = useState('');
   const [type, setType] = useState('');
   const [amount, setAmount] = useState('');
@@ -304,6 +309,7 @@ function PaymentModal({
   useEffect(() => {
     if (payment) {
       setName(payment.name);
+      setMerchant(payment.merchant ?? '');
       setDueDate(payment.dueDate);
       setType(payment.type);
       setAmount(String(payment.amount));
@@ -312,11 +318,12 @@ function PaymentModal({
       const splitPcts = members.map(m => m.splitPct);
       setSplitMethod(inferSplitMethod(pays, payment.amount, splitPcts));
       setPayCustom(pays.map(String));
-      setPaidAmounts(members.map((_, i) => paids[i] > 0 ? String(paids[i]) : ''));
+      setPaidAmounts(members.map((_, i) => String(paids[i] > 0 ? paids[i] : pays[i])));
       setPaidFlags(members.map(m => payment.userShares.find(s => s.userId === m.userId)?.isPaid ?? false));
       setPaymentMethod(payment.paymentMethod ?? 'Card');
     } else {
-      setName(''); setDueDate(''); setType(recurringCats[0]?.name ?? '');
+      setName(''); setMerchant(''); setMerchantSearch(''); setMerchantExpanded(false);
+      setDueDate(''); setType(recurringCats[0]?.name ?? '');
       setAmount(''); setSplitMethod(salaryEnabled ? 'Salary %' : '50/50');
       setPayCustom(members.map(() => ''));
       setPaidAmounts(members.map(() => ''));
@@ -336,21 +343,23 @@ function PaymentModal({
     return parseFloat(payCustom[i] ?? '0') || 0;
   });
 
+  // For new payments, keep paidAmounts in sync with payValues
+  const payValuesKey = payValues.join(',');
+  React.useEffect(() => {
+    if (!payment && amt > 0) setPaidAmounts(payValues.map(v => String(v)));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [payValuesKey, payment]);
+
   const handleSplitMethodChange = (m: SplitMethod) => {
-    if (m === 'Custom') {
-      setPayCustom(
-        splitMethod === 'Salary %' ? salaryPays.map(String) : evenPays.map(String)
-      );
-    }
+    const newCustom = splitMethod === 'Salary %' ? salaryPays.map(String) : evenPays.map(String);
+    if (m === 'Custom') setPayCustom(newCustom);
     setSplitMethod(m);
   };
 
   const handleAmountChange = (val: string) => {
     setAmount(val);
-    if (splitMethod === 'Custom') {
-      const a = parseFloat(val) || 0;
-      setPayCustom(calcEvenPays(a, members.length || 1).map(String));
-    }
+    const a = parseFloat(val) || 0;
+    if (splitMethod === 'Custom') setPayCustom(calcEvenPays(a, members.length || 1).map(String));
   };
 
   const handleSave = async () => {
@@ -369,7 +378,8 @@ function PaymentModal({
       return;
     }
     const p = {
-      name: name.trim(), dueDate, type, amount: amt,
+      name: name.trim(), merchant: merchant.trim() || undefined,
+      dueDate, type, amount: amt,
       userShares: members.map((m, i) => ({ userId: m.userId, pay: payValues[i] ?? 0, paid: rawVals[i] ?? 0, isPaid: paidFlags[i] ?? false })),
       month, paymentMethod,
     };
@@ -406,6 +416,66 @@ function PaymentModal({
 
         <MLabel text="Name" />
         <TextInput style={styles.mInput} value={name} onChangeText={setName} placeholder="e.g. House Mortgage" placeholderTextColor={Colors.textMuted} />
+
+        <MLabel text="Merchant (optional)" />
+        <TouchableOpacity
+          style={[styles.merchantSelector, { borderColor: merchantExpanded ? Colors.primary : Colors.border }]}
+          onPress={() => { setMerchantExpanded(e => !e); setMerchantSearch(''); }}
+          activeOpacity={0.8}
+        >
+          <Ionicons name="storefront-outline" size={15} color={merchant ? Colors.primary : Colors.textMuted} />
+          <Text style={[styles.merchantSelectorText, { color: merchant ? Colors.textPrimary : Colors.textMuted }]} numberOfLines={1}>
+            {merchant || 'Select merchant…'}
+          </Text>
+          {merchant ? (
+            <TouchableOpacity onPress={() => { setMerchant(''); setMerchantExpanded(false); }}>
+              <Ionicons name="close-circle" size={16} color={Colors.textMuted} />
+            </TouchableOpacity>
+          ) : (
+            <Ionicons name={merchantExpanded ? 'chevron-up' : 'chevron-down'} size={13} color={Colors.textMuted} />
+          )}
+        </TouchableOpacity>
+        {merchantExpanded && (
+          <View style={styles.merchantPanel}>
+            <View style={styles.merchantSearchWrap}>
+              <Ionicons name="search-outline" size={14} color={Colors.textMuted} />
+              <TextInput
+                style={styles.merchantSearchInput}
+                value={merchantSearch}
+                onChangeText={setMerchantSearch}
+                placeholder="Search merchants…"
+                placeholderTextColor={Colors.textMuted}
+              />
+              {!!merchantSearch && (
+                <TouchableOpacity onPress={() => setMerchantSearch('')}>
+                  <Ionicons name="close-circle" size={14} color={Colors.textMuted} />
+                </TouchableOpacity>
+              )}
+            </View>
+            <View style={styles.merchantDropdown}>
+              {merchants
+                .filter(m => !merchantSearch || m.name.toLowerCase().includes(merchantSearch.toLowerCase()))
+                .map(m => (
+                  <TouchableOpacity
+                    key={m.id}
+                    style={[styles.merchantDropRow, merchant === m.name && { backgroundColor: Colors.primaryLight }]}
+                    onPress={() => { setMerchant(m.name); setMerchantExpanded(false); setMerchantSearch(''); }}
+                  >
+                    <View style={[styles.merchantDropIcon, { backgroundColor: Colors.primaryLight }]}>
+                      <Ionicons name="storefront-outline" size={14} color={Colors.primary} />
+                    </View>
+                    <Text style={[styles.merchantDropText, merchant === m.name && { color: Colors.primary, fontWeight: '700' }]}>{m.name}</Text>
+                    {merchant === m.name && <Ionicons name="checkmark" size={14} color={Colors.primary} />}
+                  </TouchableOpacity>
+                ))}
+              {merchants.filter(m => !merchantSearch || m.name.toLowerCase().includes(merchantSearch.toLowerCase())).length === 0 && (
+                <View style={[styles.merchantDropRow, { justifyContent: 'center' }]}>
+                  <Text style={{ fontSize: 13, color: Colors.textMuted }}>No merchants found</Text>
+                </View>
+              )}
+            </View>
+          </View>
+        )}
 
         {/* Due Date + Payment Method */}
         <View style={styles.inlineRow}>
@@ -531,7 +601,7 @@ function PaymentModal({
           ))}
         </View>
 
-        {/* Payment Status - compact card, one row per member */}
+        {/* Payment Status */}
         <MLabel text="Payment Status" />
         <View style={styles.payStatusCard}>
           {members.map((m, i) => {
@@ -541,43 +611,47 @@ function PaymentModal({
             return (
               <React.Fragment key={m.nickname}>
                 {i > 0 && <View style={styles.payStatusDivider} />}
-                <View style={styles.payStatusRow}>
-                  <View style={[styles.payStatusBadge, { backgroundColor: color + '22' }]}>
-                    <Text style={[styles.payStatusNick, { color }]}>{m.nickname}</Text>
+                <View style={styles.payStatusBlock}>
+                  {/* Row 1: badge + amount input */}
+                  <View style={styles.payStatusRow}>
+                    <View style={[styles.payStatusBadge, { backgroundColor: color + '22' }]}>
+                      <Text style={[styles.payStatusNick, { color }]}>{m.nickname}</Text>
+                    </View>
+                    <TextInput
+                      style={[styles.payStatusInput, !amt && styles.payStatusInputDisabled]}
+                      value={paidAmt}
+                      onChangeText={val => { const next = [...paidAmounts]; next[i] = val; setPaidAmounts(next); }}
+                      keyboardType="decimal-pad"
+                      placeholder="Paid amount"
+                      placeholderTextColor={Colors.textMuted}
+                      editable={amt > 0}
+                    />
                   </View>
-                  <TextInput
-                    style={[styles.payStatusInput, !amt && styles.payStatusInputDisabled]}
-                    value={paidAmt}
-                    onChangeText={val => { const next = [...paidAmounts]; next[i] = val; setPaidAmounts(next); }}
-                    keyboardType="decimal-pad"
-                    placeholder="0.00"
-                    placeholderTextColor={Colors.textMuted}
-                    editable={amt > 0}
-                  />
-                  <TouchableOpacity
-                    style={[styles.payStatusToggleBtn, {
-                      borderColor: Colors.danger,
-                      backgroundColor: !isPaid ? Colors.danger : 'transparent',
-                    }]}
-                    onPress={() => {
-                      const nextFlags = [...paidFlags]; nextFlags[i] = false; setPaidFlags(nextFlags);
-                    }}
-                    disabled={amt <= 0}
-                  >
-                    <Text style={[styles.payStatusToggleBtnText, { color: !isPaid ? '#fff' : Colors.danger }]}>Not Paid</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[styles.payStatusToggleBtn, {
-                      borderColor: Colors.success,
-                      backgroundColor: isPaid ? Colors.success : 'transparent',
-                    }]}
-                    onPress={() => {
-                      const nextFlags = [...paidFlags]; nextFlags[i] = true; setPaidFlags(nextFlags);
-                    }}
-                    disabled={amt <= 0}
-                  >
-                    <Text style={[styles.payStatusToggleBtnText, { color: isPaid ? '#fff' : Colors.success }]}>Paid</Text>
-                  </TouchableOpacity>
+                  {/* Row 2: Not Paid / Paid toggle */}
+                  <View style={styles.payStatusToggleRow}>
+                    <TouchableOpacity
+                      style={[styles.payStatusToggleBtn, {
+                        borderColor: Colors.danger,
+                        backgroundColor: !isPaid ? Colors.danger : 'transparent',
+                      }]}
+                      onPress={() => { const n = [...paidFlags]; n[i] = false; setPaidFlags(n); }}
+                      disabled={amt <= 0}
+                    >
+                      <Ionicons name="close-circle-outline" size={13} color={!isPaid ? '#fff' : Colors.danger} />
+                      <Text style={[styles.payStatusToggleBtnText, { color: !isPaid ? '#fff' : Colors.danger }]}>Not Paid</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[styles.payStatusToggleBtn, {
+                        borderColor: Colors.success,
+                        backgroundColor: isPaid ? Colors.success : 'transparent',
+                      }]}
+                      onPress={() => { const n = [...paidFlags]; n[i] = true; setPaidFlags(n); }}
+                      disabled={amt <= 0}
+                    >
+                      <Ionicons name="checkmark-circle-outline" size={13} color={isPaid ? '#fff' : Colors.success} />
+                      <Text style={[styles.payStatusToggleBtnText, { color: isPaid ? '#fff' : Colors.success }]}>Paid</Text>
+                    </TouchableOpacity>
+                  </View>
                 </View>
               </React.Fragment>
             );
@@ -652,16 +726,27 @@ const styles = StyleSheet.create({
   modalDeleteBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, borderWidth: 1.5, borderColor: Colors.danger, borderRadius: 14, paddingVertical: 14, marginTop: 12 },
   modalDeleteBtnText: { color: Colors.danger, fontSize: 15, fontWeight: '600' },
   mLabel: { fontSize: 12, fontWeight: '600', color: Colors.textSecondary, marginBottom: 6, marginTop: 16, textTransform: 'uppercase', letterSpacing: 0.5 },
-  payStatusCard:              { backgroundColor: Colors.card, borderRadius: 14, borderWidth: 1, borderColor: Colors.border, overflow: 'hidden', marginTop: 4 },
-  payStatusDivider:           { height: StyleSheet.hairlineWidth, backgroundColor: Colors.border },
-  payStatusRow:               { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 10, gap: 10 },
-  payStatusBadge:             { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, minWidth: 46, alignItems: 'center' },
-  payStatusNick:              { fontSize: 13, fontWeight: '800' },
-  payStatusInput:             { flex: 1, fontSize: 15, fontWeight: '700', color: Colors.textPrimary, textAlign: 'center', paddingVertical: 7, paddingHorizontal: 10, backgroundColor: Colors.bg, borderRadius: 9, borderWidth: 1, borderColor: Colors.border },
-  payStatusInputDisabled:     { opacity: 0.4 },
-  payStatusToggleBtn:         { alignItems: 'center', justifyContent: 'center', paddingHorizontal: 9, paddingVertical: 6, borderRadius: 8, borderWidth: 1.5 },
-  payStatusToggleBtnText:     { fontSize: 10, fontWeight: '700' },
+  payStatusCard:          { backgroundColor: Colors.card, borderRadius: 14, borderWidth: 1, borderColor: Colors.border, overflow: 'hidden', marginTop: 4 },
+  payStatusDivider:       { height: StyleSheet.hairlineWidth, backgroundColor: Colors.border },
+  payStatusBlock:         { paddingHorizontal: 14, paddingTop: 10, paddingBottom: 10, gap: 8 },
+  payStatusRow:           { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  payStatusBadge:         { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, minWidth: 46, alignItems: 'center' },
+  payStatusNick:          { fontSize: 13, fontWeight: '800' },
+  payStatusInput:         { flex: 1, fontSize: 14, fontWeight: '700', color: Colors.textPrimary, textAlign: 'center', paddingVertical: 7, paddingHorizontal: 10, backgroundColor: Colors.bg, borderRadius: 9, borderWidth: 1, borderColor: Colors.border },
+  payStatusInputDisabled: { opacity: 0.4 },
+  payStatusToggleRow:     { flexDirection: 'row', gap: 8 },
+  payStatusToggleBtn:     { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, paddingVertical: 9, borderRadius: 10, borderWidth: 1.5 },
+  payStatusToggleBtnText: { fontSize: 13, fontWeight: '700' },
   mInput: { backgroundColor: Colors.card, borderRadius: 12, borderWidth: 1, borderColor: Colors.border, paddingHorizontal: 14, paddingVertical: 12, fontSize: 15, color: Colors.textPrimary },
+  merchantSelector:    { flexDirection: 'row', alignItems: 'center', gap: 7, backgroundColor: Colors.card, borderRadius: 12, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 13 },
+  merchantSelectorText: { flex: 1, fontSize: 13, fontWeight: '600' },
+  merchantPanel:       { backgroundColor: Colors.card, borderRadius: 14, borderWidth: 1, borderColor: Colors.border, padding: 12, gap: 10, marginTop: 4 },
+  merchantSearchWrap:  { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: Colors.bg, borderRadius: 10, borderWidth: 1, borderColor: Colors.border, paddingHorizontal: 10, paddingVertical: 8 },
+  merchantSearchInput: { flex: 1, fontSize: 13, color: Colors.textPrimary },
+  merchantDropdown:    { backgroundColor: Colors.bg, borderRadius: 10, borderWidth: 1, borderColor: Colors.border, overflow: 'hidden' },
+  merchantDropRow:     { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 12, paddingVertical: 10 },
+  merchantDropIcon:    { width: 28, height: 28, borderRadius: 7, alignItems: 'center', justifyContent: 'center' },
+  merchantDropText:    { flex: 1, fontSize: 13, color: Colors.textPrimary, fontWeight: '500' },
   typeGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   typeChip: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 20, borderWidth: 1, borderColor: Colors.border, backgroundColor: Colors.card },
   typeChipText: { fontSize: 13, color: Colors.textSecondary },
@@ -681,6 +766,6 @@ const styles = StyleSheet.create({
   splitPayField: { flex: 1, padding: 14, alignItems: 'center' },
   splitPayDivider: { width: 1, backgroundColor: Colors.border },
   splitPayLabel: { fontSize: 11, fontWeight: '700', marginBottom: 6, textTransform: 'uppercase', letterSpacing: 0.5 },
-  splitPayInput: { width: '100%', borderRadius: 8, borderWidth: 1.5, paddingHorizontal: 10, paddingVertical: 8, fontSize: 18, fontWeight: '800', color: Colors.textPrimary, textAlign: 'center', backgroundColor: 'transparent' },
+  splitPayInput: { width: '100%', borderRadius: 8, borderWidth: 1.5, paddingHorizontal: 10, paddingVertical: 7, fontSize: 15, fontWeight: '700', color: Colors.textPrimary, textAlign: 'center', backgroundColor: 'transparent' },
   splitPayInputDisabled: { borderWidth: 0, color: Colors.textPrimary },
 });

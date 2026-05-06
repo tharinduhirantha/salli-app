@@ -45,10 +45,36 @@ export default function SettingsSalaryScreen() {
     setSalarySplitEnabled(enabled);
     if (!enabled && currentHouse) {
       try {
-        await clearMemberSplitPcts(currentHouse.id, splitMonth);
+        await Promise.all([
+          clearMemberSplitPcts(currentHouse.id, splitMonth),
+          clearMemberSplitPcts(currentHouse.id, 'default'),
+        ]);
         setStoredSplitPcts({});
         setSplitPctInputs({});
       } catch (e: any) { showAlert('Error', e.message); }
+    } else if (enabled && currentHouse && members.length >= 2) {
+      // Auto-save equal splits so Salary % activates immediately in Categories
+      const base = Math.floor(100 / members.length);
+      const remainder = 100 - base * members.length;
+      const inputs: Record<string, string> = {};
+      members.forEach((m, i) => { inputs[m.userId] = String(base + (i === 0 ? remainder : 0)); });
+      // Only auto-save if no existing data
+      const hasExisting = members.every(m => storedSplitPcts[m.userId] != null);
+      if (!hasExisting) {
+        setSplitPctInputs(inputs);
+        try {
+          await Promise.all(members.flatMap((m, i) => {
+            const pct = base + (i === 0 ? remainder : 0);
+            return [
+              upsertMemberSplitPct(currentHouse.id, m.userId, pct, splitMonth),
+              upsertMemberSplitPct(currentHouse.id, m.userId, pct, 'default'),
+            ];
+          }));
+          const pcts: Record<string, number | null> = {};
+          members.forEach((m, i) => { pcts[m.userId] = base + (i === 0 ? remainder : 0); });
+          setStoredSplitPcts(pcts);
+        } catch (e: any) { showAlert('Error', e.message); }
+      }
     }
   };
 
@@ -58,9 +84,10 @@ export default function SettingsSalaryScreen() {
     if (Math.round(total) !== 100) { showAlert('Invalid', 'Total must equal exactly 100%.'); return; }
     setSplitSaving(true);
     try {
-      await Promise.all(members.map(m =>
-        upsertMemberSplitPct(currentHouse.id, m.userId, parseFloat(splitPctInputs[m.userId] ?? '0') || 0, splitMonth)
-      ));
+      await Promise.all(members.flatMap(m => [
+        upsertMemberSplitPct(currentHouse.id, m.userId, parseFloat(splitPctInputs[m.userId] ?? '0') || 0, splitMonth),
+        upsertMemberSplitPct(currentHouse.id, m.userId, parseFloat(splitPctInputs[m.userId] ?? '0') || 0, 'default'),
+      ]));
       const pcts: Record<string, number | null> = {};
       members.forEach(m => { pcts[m.userId] = parseFloat(splitPctInputs[m.userId] ?? '0') || 0; });
       setStoredSplitPcts(pcts);

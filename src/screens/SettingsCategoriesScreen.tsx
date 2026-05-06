@@ -2,12 +2,12 @@ import React, { useCallback, useState } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity,
   ScrollView, KeyboardAvoidingView, Platform, Modal, TextInput, Switch,
+  useWindowDimensions,
 } from 'react-native';
 import { useAlert } from '../context/AlertContext';
 import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
-import { getCategories, addCategory, updateCategory, deleteCategory, Category, getHouseMembers, getMemberSplitPcts, HouseMember } from '../db/queries';
-import { currentMonth } from '../utils/date';
+import { getCategories, addCategory, updateCategory, deleteCategory, Category, getHouseMembers, HouseMember } from '../db/queries';
 import { Colors } from '../utils/theme';
 import ScreenWrapper from '../components/ScreenWrapper';
 import { useHouse } from '../context/HouseContext';
@@ -56,27 +56,22 @@ interface ModalState {
 export default function SettingsCategoriesScreen() {
   const { currentHouse } = useHouse();
   const { showAlert } = useAlert();
+  const { height: winHeight } = useWindowDimensions();
 
   const [cats, setCats]       = useState<Category[]>([]);
   const [members, setMembers] = useState<HouseMember[]>([]);
-  const [storedSplitPcts, setStoredSplitPcts] = useState<Record<string, number | null>>({});
-  const [salarySplitEnabled, setSalarySplitEnabled] = useState(false);
   const [modal, setModal] = useState<ModalState>({
     visible: false, editing: null, name: '', split: 'Half', icon: 'help-circle-outline', isRecurring: false, isOutOfPocket: false,
   });
 
   const loadData = useCallback(async () => {
     if (!currentHouse) return;
-    const [c, m, pcts] = await Promise.all([
+    const [c, m] = await Promise.all([
       getCategories(currentHouse.id),
       getHouseMembers(currentHouse.id),
-      getMemberSplitPcts(currentHouse.id, currentMonth()),
     ]);
     setCats(c);
     setMembers(m);
-    setStoredSplitPcts(pcts);
-    const total = m.reduce((s, mem) => s + (pcts[mem.userId] ?? 0), 0);
-    setSalarySplitEnabled(m.length >= 2 && m.every(mem => pcts[mem.userId] != null) && Math.round(total) === 100);
   }, [currentHouse]);
 
   useFocusEffect(useCallback(() => { loadData(); }, [loadData]));
@@ -111,7 +106,9 @@ export default function SettingsCategoriesScreen() {
     );
   };
 
-  const visibleCats = cats.filter(cat => members.length >= 2 || cat.split !== 'Personal');
+  const visibleCats = cats
+    .filter(cat => members.length >= 2 || cat.split !== 'Personal')
+    .sort((a, b) => a.name.localeCompare(b.name));
 
   return (
     <ScreenWrapper>
@@ -135,7 +132,14 @@ export default function SettingsCategoriesScreen() {
               <View style={[s.catIcon, { backgroundColor: SPLIT_COLORS[cat.split] + '18' }]}>
                 <Ionicons name={cat.icon as any ?? 'help-circle-outline'} size={16} color={SPLIT_COLORS[cat.split]} />
               </View>
-              <Text style={s.catName}>{cat.name}</Text>
+              <View style={{ flex: 1 }}>
+                <Text style={s.catName}>{cat.name}</Text>
+                {(cat.isRecurring || cat.isOutOfPocket) && (
+                  <Text style={s.catTags}>
+                    {[cat.isRecurring && 'recurring', cat.isOutOfPocket && 'out of pocket'].filter(Boolean).join(' · ')}
+                  </Text>
+                )}
+              </View>
               <View style={[s.splitBadge, { backgroundColor: SPLIT_COLORS[cat.split] + '20' }]}>
                 <Text style={[s.splitBadgeText, { color: SPLIT_COLORS[cat.split] }]}>
                   {SPLIT_OPTIONS.find(o => o.value === cat.split)?.label ?? cat.split}
@@ -152,10 +156,10 @@ export default function SettingsCategoriesScreen() {
       </ScrollView>
 
       {/* Category Modal */}
-      <Modal visible={modal.visible} animationType="slide" transparent presentationStyle="overFullScreen">
+      <Modal visible={modal.visible} animationType="slide" transparent>
         <View style={s.modalOverlay}>
-          <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ width: '100%' }}>
-            <View style={s.modalCard}>
+          <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ width: '100%' }}>
+            <View style={[s.modalCard, { maxHeight: winHeight * 0.85 }]}>
               <View style={s.modalHeader}>
                 <Text style={s.modalTitle}>{modal.editing ? 'Edit Category' : 'Add Category'}</Text>
                 <TouchableOpacity onPress={closeModal}>
@@ -186,10 +190,7 @@ export default function SettingsCategoriesScreen() {
                 ) : (
                   <View style={s.splitOptions}>
                     {SPLIT_OPTIONS.filter(o => !o.requiresOne).map(opt => {
-                      const isSalaryValid = salarySplitEnabled && members.length >= 2 &&
-                        members.every(m => storedSplitPcts[m.userId] != null) &&
-                        Math.round(members.reduce((sum, m) => sum + (storedSplitPcts[m.userId] ?? 0), 0)) === 100;
-                      const isDisabled = opt.value === 'Salary' && !isSalaryValid;
+                      const isDisabled = opt.value === 'Salary' && members.length < 2;
                       const isSelected = modal.split === opt.value && !isDisabled;
                       return (
                         <TouchableOpacity
@@ -287,15 +288,16 @@ const s = StyleSheet.create({
   card:            { backgroundColor: Colors.card, borderRadius: 16, padding: 16, shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 8, elevation: 2 },
   addBtn:          { flexDirection: 'row', alignItems: 'center', gap: 4 },
   addBtnText:      { fontSize: 13, fontWeight: '600', color: Colors.primary },
-  catRow:          { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, gap: 10 },
+  catRow:          { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, gap: 10 },
   catRowBorder:    { borderBottomWidth: 1, borderBottomColor: Colors.border },
   catIcon:         { width: 32, height: 32, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
-  catName:         { flex: 1, fontSize: 15, color: Colors.textPrimary, fontWeight: '500' },
+  catName:         { fontSize: 15, color: Colors.textPrimary, fontWeight: '500' },
+  catTags:         { fontSize: 10, color: Colors.textMuted, marginTop: 1 },
   splitBadge:      { borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3, marginRight: 8 },
   splitBadgeText:  { fontSize: 11, fontWeight: '700' },
   mutedText:       { fontSize: 14, color: Colors.textMuted, textAlign: 'center', paddingVertical: 12 },
-  modalOverlay:    { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
-  modalCard:       { backgroundColor: Colors.card, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, paddingBottom: 40, maxHeight: '85%' },
+  modalOverlay:    { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end', ...(Platform.OS === 'web' && { position: 'fixed' as any, top: 0, left: 0, right: 0, bottom: 0 }) },
+  modalCard:       { backgroundColor: Colors.card, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, paddingBottom: 40 },
   modalHeader:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 },
   modalTitle:      { fontSize: 18, fontWeight: '700', color: Colors.textPrimary },
   modalLabel:      { fontSize: 12, fontWeight: '600', color: Colors.textMuted, marginBottom: 6, marginTop: 12, textTransform: 'uppercase', letterSpacing: 0.5 },

@@ -8,7 +8,7 @@ const splashImage  = require('./assets/splash.png');
 const appIcon      = require('./assets/icon.png');
 
 function isMobileDevice(): boolean {
-  if (Platform.OS !== 'web') return true;
+  return true; // TEMP: disabled for debugging
   const ua = window.navigator.userAgent;
   const mobileUA = /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(ua);
   const narrowScreen = window.screen.width <= 768;

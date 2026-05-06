@@ -15,7 +15,7 @@ const USER_COLORS = [Colors.th, Colors.ma, Colors.user3, Colors.user4];
 const USER_LIGHT  = [Colors.thLight, Colors.maLight, Colors.user3Light, Colors.user4Light];
 
 interface TxRow    { date: string; owner: string; category: string; description: string; amount: number; status: string; }
-interface RecRow   { type: string; amount: number; th_paid: number; ma_paid: number; }
+interface RecRow   { name: string; type: string; amount: number; dueDate: string; }
 interface PaidGroup { label: string; total: number; }
 interface WeekStat { label: string; dateRange: string; total: number; txns: TxRow[]; }
 
@@ -129,7 +129,7 @@ export default function DashboardScreen() {
           .order('date', { ascending: true }),
         supabase
           .from('recurring_payments')
-          .select('type, amount, th_paid, ma_paid')
+          .select('name, type, amount, due_date')
           .eq('month', month)
           .eq('house_id', currentHouse.id),
         getCategories(currentHouse.id),
@@ -137,7 +137,7 @@ export default function DashboardScreen() {
       setSummary(s);
       setPrevTotal(prevS.total);
       setTxns(txResult.data ?? []);
-      setRecRows(recResult.data ?? []);
+      setRecRows((recResult.data ?? []).map((r: any) => ({ name: r.name, type: r.type, amount: r.amount, dueDate: r.due_date })));
       const map: Record<string, string> = {};
       cats.forEach(c => { map[c.name] = c.icon; });
       setIconMap(map);
@@ -153,7 +153,7 @@ export default function DashboardScreen() {
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
   if (loading || !summary) {
-    return <View style={styles.center}><ActivityIndicator size="large" color="#FFFFFF" /></View>;
+    return <View style={styles.center}><ActivityIndicator size="large" color={Colors.primary} /></View>;
   }
 
   const u1 = summary.users[0];
@@ -173,8 +173,15 @@ export default function DashboardScreen() {
     txByCategory[t.category].push(t);
   });
 
+  // Group recurring by type/category
+  const recByCategory: Record<string, RecRow[]> = {};
+  recRows.forEach(r => {
+    if (!recByCategory[r.type]) recByCategory[r.type] = [];
+    recByCategory[r.type].push(r);
+  });
+
   // Paid groups per user
-  const paidGroupsByUser: PaidGroup[][] = summary.users.map((u, i) => {
+  const paidGroupsByUser: PaidGroup[][] = summary.users.map((u) => {
     const groups: PaidGroup[] = [];
     const seen: Record<string, number> = {};
     txns.filter(t => t.category !== 'Personal' && t.owner === u.nickname).forEach(t => {
@@ -186,14 +193,12 @@ export default function DashboardScreen() {
       }
     });
     recRows.forEach(r => {
-      const amt = i === 0 ? r.th_paid : r.ma_paid;
-      if (amt > 0) {
-        if (seen[r.type] === undefined) {
-          seen[r.type] = groups.length;
-          groups.push({ label: r.type, total: amt });
-        } else {
-          groups[seen[r.type]].total += amt;
-        }
+      const share = r.amount / Math.max(summary.users.length, 1);
+      if (seen[r.type] === undefined) {
+        seen[r.type] = groups.length;
+        groups.push({ label: r.type, total: share });
+      } else {
+        groups[seen[r.type]].total += share;
       }
     });
     return groups;
@@ -209,7 +214,7 @@ export default function DashboardScreen() {
 
   // Recurring totals
   const recTotal  = recRows.reduce((s, r) => s + r.amount, 0);
-  const recUnpaid = recRows.reduce((s, r) => s + Math.max(0, r.amount - r.th_paid - r.ma_paid), 0);
+  const recUnpaid = recTotal; // treat all recurring as unpaid for the summary card
 
   // ── Weekly breakdown ──
   const [cy, cm] = month.split('-').map(Number);
@@ -482,6 +487,7 @@ export default function DashboardScreen() {
           <CategoryPopup
             row={selectedCat}
             txns={selectedCat ? (txByCategory[selectedCat.label] ?? []) : []}
+            recRows={selectedCat ? (recByCategory[selectedCat.label] ?? []) : []}
             iconMap={iconMap}
             onClose={() => setSelectedCat(null)}
           />
@@ -604,20 +610,26 @@ function PaidGroupsPopup({ data, onClose }: {
   );
 }
 
-function CategoryPopup({ row, txns, iconMap, onClose }: {
-  row: CatRow | null; txns: TxRow[]; iconMap: Record<string, string>; onClose: () => void;
+function CategoryPopup({ row, txns, recRows, iconMap, onClose }: {
+  row: CatRow | null; txns: TxRow[]; recRows: RecRow[]; iconMap: Record<string, string>; onClose: () => void;
 }) {
   if (!row) return null;
+  const hasItems = txns.length > 0 || recRows.length > 0;
   return (
     <Modal visible transparent animationType="fade" onRequestClose={onClose}>
-      <TouchableOpacity style={styles.popupOverlay} activeOpacity={1} onPress={onClose}>
+      <TouchableOpacity style={[styles.popupOverlay, Platform.OS === 'web' && { position: 'fixed' as any, top: 0, left: 0, right: 0, bottom: 0, zIndex: 99999 }]} activeOpacity={1} onPress={onClose}>
         <TouchableOpacity activeOpacity={1} style={styles.popupCard} onPress={() => {}}>
           <View style={styles.popupHeader}>
             <View style={styles.catIconWrap}>
               <Ionicons name={(iconMap[row.label] ?? 'help-circle-outline') as any} size={18} color={Colors.navy} />
             </View>
             <Text style={styles.popupTitle}>{row.label}</Text>
-            <Text style={styles.popupTotal}>{fmt(row.total)}</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+              <Text style={styles.popupTotal}>{fmt(row.total)}</Text>
+              <TouchableOpacity onPress={onClose}>
+                <Ionicons name="close" size={20} color={Colors.textMuted} />
+              </TouchableOpacity>
+            </View>
           </View>
           <View style={styles.popupShares}>
             {row.userPays.map((up, j) => (
@@ -627,19 +639,36 @@ function CategoryPopup({ row, txns, iconMap, onClose }: {
               </View>
             ))}
           </View>
-          {txns.length > 0 && (
-            <>
-              <View style={styles.popupDivider} />
-              {txns.map((t, i) => (
-                <View key={i} style={styles.popupTxRow}>
-                  <Text style={styles.popupTxDate}>{t.date.slice(5)}</Text>
-                  <Text style={styles.popupTxDesc} numberOfLines={1}>{t.description}</Text>
-                  <Text style={styles.popupTxAmt}>{fmt(t.amount)}</Text>
-                  <Text style={styles.popupTxOwner}>{t.owner}</Text>
-                </View>
-              ))}
-            </>
-          )}
+          {hasItems && <View style={styles.popupDivider} />}
+          <ScrollView style={{ maxHeight: 340 }} showsVerticalScrollIndicator={false}>
+            {recRows.length > 0 && (
+              <>
+                <Text style={styles.popupSectionLabel}>RECURRING</Text>
+                {recRows.map((r, i) => (
+                  <View key={i} style={[styles.popupTxRow, i < recRows.length - 1 && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: Colors.border }]}>
+                    <Ionicons name="card-outline" size={13} color={Colors.primary} style={{ marginRight: 4 }} />
+                    <Text style={[styles.popupTxDesc, { flex: 1 }]} numberOfLines={1}>{r.name}</Text>
+                    <Text style={styles.popupTxDate}>{r.dueDate}</Text>
+                    <Text style={[styles.popupTxAmt, { color: Colors.primary }]}>{fmt(r.amount)}</Text>
+                  </View>
+                ))}
+              </>
+            )}
+            {txns.length > 0 && (
+              <>
+                {recRows.length > 0 && <View style={styles.popupDivider} />}
+                <Text style={styles.popupSectionLabel}>TRANSACTIONS</Text>
+                {txns.map((t, i) => (
+                  <View key={i} style={[styles.popupTxRow, i < txns.length - 1 && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: Colors.border }]}>
+                    <Text style={styles.popupTxDate}>{t.date.slice(5)}</Text>
+                    <Text style={styles.popupTxDesc} numberOfLines={1}>{t.description}</Text>
+                    <Text style={styles.popupTxAmt}>{fmt(t.amount)}</Text>
+                    <Text style={styles.popupTxOwner}>{t.owner}</Text>
+                  </View>
+                ))}
+              </>
+            )}
+          </ScrollView>
         </TouchableOpacity>
       </TouchableOpacity>
     </Modal>
@@ -650,7 +679,7 @@ const styles = StyleSheet.create({
   outer:      { flex: 1 },
   whiteHalf:  { flex: 1, backgroundColor: Colors.bg, borderTopLeftRadius: 20, borderTopRightRadius: 20, paddingTop: 20, overflow: Platform.OS === 'web' ? 'visible' : 'hidden', zIndex: 1 },
   content:    { padding: 16, paddingBottom: 36 },
-  center:     { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  center:     { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: Colors.bg },
 
   monthCard:  { alignSelf: 'center', width: '44%', marginTop: 6, marginBottom: -16, zIndex: 2, backgroundColor: Colors.card, borderRadius: 12, paddingVertical: 5, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOpacity: 0.10, shadowRadius: 8, shadowOffset: { width: 0, height: 2 }, elevation: 6 },
   navBtn:     { padding: 6 },
@@ -765,6 +794,7 @@ const styles = StyleSheet.create({
   popupTxDesc:     { flex: 1, fontSize: 12, color: Colors.textSecondary },
   popupTxAmt:      { fontSize: 12, fontWeight: '700', color: Colors.textPrimary },
   popupTxOwner:    { fontSize: 10, color: Colors.textMuted, width: 28, textAlign: 'right' },
+  popupSectionLabel: { fontSize: 10, fontWeight: '700', color: Colors.textMuted, letterSpacing: 0.6, marginBottom: 4, marginTop: 4 },
 
   paidPopupCard:        { width: '100%', backgroundColor: Colors.card, borderRadius: 20, overflow: 'hidden', shadowColor: '#000', shadowOpacity: 0.2, shadowRadius: 20, elevation: 10 },
   paidPopupHeader:      { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 16, borderBottomWidth: 2 },

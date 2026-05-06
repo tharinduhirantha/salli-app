@@ -34,6 +34,7 @@ export interface RecurringPaymentShare {
 export interface RecurringPayment {
   id: string;
   name: string;
+  merchant?: string;
   dueDate: string;
   type: string;
   amount: number;

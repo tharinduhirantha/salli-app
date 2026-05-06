@@ -32,6 +32,47 @@ if (!fs.existsSync(assetsDir)) fs.mkdirSync(assetsDir, { recursive: true });
 const srcIcon = path.join(__dirname, '..', 'assets', 'icon.png');
 fs.copyFileSync(srcIcon, path.join(assetsDir, 'icon.png'));
 
+// Flatten all node_modules assets to /assets/flat/ — Cloudflare Pages can't serve paths
+// containing @ (e.g. @expo/vector-icons fonts, @react-navigation back-button PNGs)
+const flatOutDir = path.join(assetsDir, 'flat');
+if (!fs.existsSync(flatOutDir)) fs.mkdirSync(flatOutDir, { recursive: true });
+
+const flatExts = new Set(['.ttf', '.otf', '.woff', '.woff2', '.png', '.jpg', '.jpeg', '.gif', '.svg', '.webp']);
+const flatPathMap = {};
+
+function collectNodeModuleAssets(dir) {
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    const full = path.join(dir, entry.name);
+    if (entry.isDirectory()) {
+      collectNodeModuleAssets(full);
+    } else if (flatExts.has(path.extname(entry.name).toLowerCase())) {
+      const oldRelative = '/' + path.relative(distDir, full).replace(/\\/g, '/');
+      if (oldRelative.includes('/node_modules/')) {
+        const newRelative = `/assets/flat/${entry.name}`;
+        fs.copyFileSync(full, path.join(flatOutDir, entry.name));
+        flatPathMap[oldRelative] = newRelative;
+      }
+    }
+  }
+}
+collectNodeModuleAssets(assetsDir);
+
+// Patch JS bundle to reference new flat asset paths
+const jsBundleDir = path.join(distDir, '_expo', 'static', 'js', 'web');
+if (fs.existsSync(jsBundleDir)) {
+  for (const file of fs.readdirSync(jsBundleDir)) {
+    if (file.endsWith('.js')) {
+      const jsPath = path.join(jsBundleDir, file);
+      let js = fs.readFileSync(jsPath, 'utf8');
+      for (const [oldPath, newPath] of Object.entries(flatPathMap)) {
+        js = js.split(oldPath).join(newPath);
+      }
+      fs.writeFileSync(jsPath, js);
+    }
+  }
+}
+console.log(`✅ Flattened ${Object.keys(flatPathMap).length} node_modules assets to /assets/flat/`);
+
 // Patch index.html
 let html = fs.readFileSync(indexPath, 'utf8');
 
@@ -60,6 +101,44 @@ const pwaTags = [
 html = html.replace('</head>', pwaTags + '\n</head>');
 
 fs.writeFileSync(indexPath, html);
+
+// Write _redirects for Cloudflare Pages SPA routing
+fs.writeFileSync(path.join(distDir, '_redirects'), '/* /index.html 200\n');
+
+// Write _headers for Cloudflare Pages — MIME types + cache control
+fs.writeFileSync(path.join(distDir, '_headers'), `/index.html
+  Cache-Control: no-cache, no-store, must-revalidate
+  Pragma: no-cache
+
+/
+  Cache-Control: no-cache, no-store, must-revalidate
+  Pragma: no-cache
+
+/_expo/static/*
+  Cache-Control: public, max-age=31536000, immutable
+
+/assets/flat/*
+  Cache-Control: public, max-age=31536000, immutable
+
+/*.ttf
+  Content-Type: font/ttf
+  Access-Control-Allow-Origin: *
+
+/*.otf
+  Content-Type: font/otf
+  Access-Control-Allow-Origin: *
+
+/*.woff
+  Content-Type: font/woff
+  Access-Control-Allow-Origin: *
+
+/*.woff2
+  Content-Type: font/woff2
+  Access-Control-Allow-Origin: *
+`);
+
 console.log('✅ Patched dist/index.html with PWA meta tags + scroll fix');
 console.log('✅ Created dist/manifest.json');
 console.log('✅ Copied icon to dist/assets/icon.png');
+console.log('✅ Created dist/_redirects for Cloudflare Pages');
+console.log('✅ Created dist/_headers with font MIME types');
