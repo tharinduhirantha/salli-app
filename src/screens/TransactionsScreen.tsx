@@ -9,7 +9,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { getTransactions, deleteTransaction, getHouseMembers, HouseMember } from '../db/queries';
 import { useHouse } from '../context/HouseContext';
 import { Transaction } from '../types';
-import { monthLabel } from '../utils/date';
+import { monthLabel, prevMonth as calcPrevMonth } from '../utils/date';
 import { Colors, categoryColor, fmt, memberBadgeColor } from '../utils/theme';
 
 const ICON_MAP: Record<string, string> = {
@@ -56,15 +56,18 @@ export default function TransactionsScreen() {
   const [ownerFilter, setOwnerFilter] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [prevMonthTotal, setPrevMonthTotal] = useState<number | null>(null);
 
   const load = useCallback(async (isRefresh = false) => {
     if (!currentHouse) return;
     if (isRefresh) setRefreshing(true); else setLoading(true);
-    const [data, mems] = await Promise.all([
+    const [data, prevData, mems] = await Promise.all([
       getTransactions(month, currentHouse.id),
+      getTransactions(calcPrevMonth(month), currentHouse.id),
       getHouseMembers(currentHouse.id),
     ]);
     setTransactions(data);
+    setPrevMonthTotal(prevData.reduce((s, t) => s + t.amount, 0));
     setMembers(mems);
     if (isRefresh) setRefreshing(false); else setLoading(false);
   }, [month, currentHouse]);
@@ -175,6 +178,37 @@ export default function TransactionsScreen() {
         contentContainerStyle={styles.content}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => load(true)} />}
       >
+        {/* Summary card */}
+        {transactions.length > 0 && (
+          <View style={styles.txSummaryCard}>
+            <View style={styles.txSummaryHeader}>
+              <View style={{ gap: 4 }}>
+                <Text style={styles.txSummaryLabel}>Total Monthly</Text>
+                <Text style={styles.txSummaryAmount}>{fmt(totalAmt)}</Text>
+                {prevMonthTotal !== null && prevMonthTotal > 0 && (
+                  <View style={[
+                    styles.txSummaryBadge,
+                    { backgroundColor: totalAmt >= prevMonthTotal ? Colors.successLight : '#FEF2F2' },
+                  ]}>
+                    <Ionicons
+                      name={totalAmt >= prevMonthTotal ? 'arrow-up' : 'arrow-down'}
+                      size={11}
+                      color={totalAmt >= prevMonthTotal ? Colors.success : Colors.danger}
+                    />
+                    <Text style={[styles.txSummaryBadgeText, { color: totalAmt >= prevMonthTotal ? Colors.success : Colors.danger }]}>
+                      {Math.abs(Math.round(((totalAmt - prevMonthTotal) / prevMonthTotal) * 1000) / 10)}%
+                    </Text>
+                    <Text style={styles.txSummaryBadgeVs}>vs {monthLabel(calcPrevMonth(month))}</Text>
+                  </View>
+                )}
+              </View>
+              <View style={styles.txSummaryDecor}>
+                <Ionicons name="receipt-outline" size={22} color={Colors.primary} style={{ opacity: 0.6 }} />
+              </View>
+            </View>
+          </View>
+        )}
+
         {/* Date-grouped sections */}
         {sections.length === 0 ? (
           <View style={styles.empty}>
@@ -271,6 +305,14 @@ const styles = StyleSheet.create({
   memberChipText:{ fontSize: 12, fontWeight: '600', color: Colors.textSecondary },
 
   content: { padding: 16, paddingBottom: 100 },
+  txSummaryCard:      { backgroundColor: Colors.card, borderRadius: 20, marginBottom: 16, borderWidth: 1, borderColor: Colors.border, overflow: 'hidden', shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 12, elevation: 4 },
+  txSummaryHeader:    { flexDirection: 'row', alignItems: 'center', backgroundColor: '#D6DDEF', padding: 14 },
+  txSummaryLabel:     { fontSize: 12, fontWeight: '600', color: Colors.textSecondary },
+  txSummaryAmount:    { fontSize: 22, fontWeight: '800', color: Colors.textPrimary },
+  txSummaryBadge:     { flexDirection: 'row', alignItems: 'center', gap: 3, alignSelf: 'flex-start', paddingHorizontal: 7, paddingVertical: 3, borderRadius: 8 },
+  txSummaryBadgeText: { fontSize: 11, fontWeight: '700' },
+  txSummaryBadgeVs:   { fontSize: 10, color: Colors.textSecondary, fontWeight: '500' },
+  txSummaryDecor:     { flex: 1, alignItems: 'flex-end', justifyContent: 'center' },
 
   summaryCard:    { flexDirection: 'row', backgroundColor: Colors.card, borderRadius: 16, padding: 12, marginHorizontal: 16, marginTop: 12, marginBottom: 8, shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 8, elevation: 3 },
   summaryHalf:    { flex: 1 },
