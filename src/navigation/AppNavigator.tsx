@@ -27,7 +27,6 @@ import SettingsProfileScreen from '../screens/SettingsProfileScreen';
 import SettingsSalaryScreen from '../screens/SettingsSalaryScreen';
 import SettingsCategoriesScreen from '../screens/SettingsCategoriesScreen';
 import SettingsMerchantsScreen from '../screens/SettingsMerchantsScreen';
-import SettingsExpenseNamesScreen from '../screens/SettingsExpenseNamesScreen';
 import GuideScreen from '../screens/GuideScreen';
 import TermsScreen from '../screens/TermsScreen';
 import AppHeader from '../components/AppHeader';
@@ -155,8 +154,7 @@ function RootNavigator() {
           <Stack.Screen name="ProfileHousehold" component={SettingsProfileScreen}    options={{ title: 'Profile & Household' }} />
           <Stack.Screen name="SalarySplit"      component={SettingsSalaryScreen}     options={{ title: 'Salary Split' }} />
           <Stack.Screen name="Categories"       component={SettingsCategoriesScreen} options={{ title: 'Categories' }} />
-          <Stack.Screen name="Merchants"        component={SettingsMerchantsScreen}      options={{ title: 'Merchants' }} />
-          <Stack.Screen name="ExpenseNames"     component={SettingsExpenseNamesScreen}   options={{ title: 'Expense Names' }} />
+          <Stack.Screen name="Merchants"        component={SettingsMerchantsScreen}  options={{ title: 'Merchants' }} />
           <Stack.Screen name="Yearly"           component={YearlyScreen}             options={{ title: 'Yearly Breakdown' }} />
           <Stack.Screen name="Guide"            component={GuideScreen}              options={{ headerShown: false }} />
           <Stack.Screen name="Terms"            component={TermsScreen}              options={{ headerShown: false }} />

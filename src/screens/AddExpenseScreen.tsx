@@ -6,7 +6,7 @@ import {
 import { useAlert } from '../context/AlertContext';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
-import { addTransaction, updateTransaction, deleteTransaction, getCategories, getHouseMembers, getMerchants, getExpenseNames, HouseMember, Category, Merchant, ExpenseName } from '../db/queries';
+import { addTransaction, updateTransaction, deleteTransaction, getCategories, getHouseMembers, getMerchants, HouseMember, Category, Merchant } from '../db/queries';
 import { Transaction, Owner, PayStatus, PaymentMethod } from '../types';
 import { today } from '../utils/date';
 import { Colors, categoryColor } from '../utils/theme';
@@ -28,10 +28,8 @@ export default function AddExpenseScreen() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [houseMembers, setHouseMembers] = useState<HouseMember[]>([]);
   const [merchants, setMerchants] = useState<Merchant[]>([]);
-  const [expenseNames, setExpenseNames] = useState<ExpenseName[]>([]);
   const [catSearch, setCatSearch] = useState('');
   const [merchantSearch, setMerchantSearch] = useState('');
-  const [expenseNameSearch, setExpenseNameSearch] = useState('');
   const [date, setDate] = useState(existing?.date ?? (month ? `${month}-01` : today()));
   const [category, setCategory] = useState(existing?.category ?? 'Food');
   const [owner, setOwner] = useState<Owner>(existing?.owner ?? currentUser?.nickname ?? '');
@@ -43,7 +41,6 @@ export default function AddExpenseScreen() {
   const [saving, setSaving] = useState(false);
   const [catExpanded, setCatExpanded] = useState(false);
   const [merchantExpanded, setMerchantExpanded] = useState(false);
-  const [expenseNameExpanded, setExpenseNameExpanded] = useState(false);
 
   const isPersonal = category === 'Personal';
 
@@ -56,7 +53,6 @@ export default function AddExpenseScreen() {
     getCategories(currentHouse.id).then(cats => setCategories(cats.filter(c => !c.isRecurring)));
     getHouseMembers(currentHouse.id).then(setHouseMembers);
     getMerchants(currentHouse.id).then(setMerchants);
-    getExpenseNames(currentHouse.id).then(setExpenseNames);
   }, [currentHouse]);
 
   const handleDelete = () => {
@@ -283,72 +279,6 @@ export default function AddExpenseScreen() {
               );
             })()}
           </View>
-        )}
-
-        {/* Expense Name (optional) */}
-        {expenseNames.length > 0 && (
-          <>
-            <Label text="Expense Name (optional)" />
-            <TouchableOpacity
-              style={[styles.catSelector, { borderColor: expenseNameExpanded ? Colors.primary : Colors.border }]}
-              onPress={() => { setExpenseNameExpanded(e => !e); setExpenseNameSearch(''); }}
-              activeOpacity={0.8}
-            >
-              <Ionicons name="pricetag-outline" size={15} color={description ? Colors.primary : Colors.textMuted} />
-              <Text style={[styles.catSelectorText, { color: Colors.textMuted }]} numberOfLines={1}>
-                {'Quick-fill description…'}
-              </Text>
-              <Ionicons name={expenseNameExpanded ? 'chevron-up' : 'chevron-down'} size={13} color={Colors.textMuted} />
-            </TouchableOpacity>
-            {expenseNameExpanded && (
-              <View style={styles.catPanel}>
-                <View style={styles.catSearchWrap}>
-                  <Ionicons name="search-outline" size={14} color={Colors.textMuted} />
-                  <TextInput
-                    style={styles.catSearchInput}
-                    value={expenseNameSearch}
-                    onChangeText={setExpenseNameSearch}
-                    placeholder="Search expense names…"
-                    placeholderTextColor={Colors.textMuted}
-                    autoFocus
-                  />
-                  {!!expenseNameSearch && (
-                    <TouchableOpacity onPress={() => setExpenseNameSearch('')}>
-                      <Ionicons name="close-circle" size={14} color={Colors.textMuted} />
-                    </TouchableOpacity>
-                  )}
-                </View>
-                {(() => {
-                  const filtered = expenseNames.filter(e => !expenseNameSearch || e.name.toLowerCase().includes(expenseNameSearch.toLowerCase()));
-                  return (
-                    <ScrollView style={styles.merchantScroll} nestedScrollEnabled keyboardShouldPersistTaps="handled">
-                      {filtered.length === 0 ? (
-                        <View style={[styles.catDropRow, { justifyContent: 'center' }]}>
-                          <Text style={{ fontSize: 13, color: Colors.textMuted }}>No matches found</Text>
-                        </View>
-                      ) : filtered.map(e => (
-                        <TouchableOpacity
-                          key={e.id}
-                          style={[styles.catDropRow, description === e.name && { backgroundColor: Colors.primaryLight }]}
-                          onPress={() => {
-                            setDescription(e.name);
-                            setExpenseNameExpanded(false);
-                            setExpenseNameSearch('');
-                          }}
-                        >
-                          <View style={[styles.catDropIcon, { backgroundColor: Colors.primaryLight }]}>
-                            <Ionicons name="pricetag-outline" size={14} color={Colors.primary} />
-                          </View>
-                          <Text style={[styles.catDropText, description === e.name && { color: Colors.primary, fontWeight: '700' }]}>{e.name}</Text>
-                          {description === e.name && <Ionicons name="checkmark" size={14} color={Colors.primary} />}
-                        </TouchableOpacity>
-                      ))}
-                    </ScrollView>
-                  );
-                })()}
-              </View>
-            )}
-          </>
         )}
 
         {/* Description */}

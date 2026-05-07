@@ -36,13 +36,6 @@ const MENU_ITEMS = [
     title: 'Merchants',
     desc: 'Manage your house merchants',
   },
-  {
-    screen: 'ExpenseNames',
-    icon: 'pricetag-outline' as const,
-    color: Colors.success,
-    title: 'Expense Names',
-    desc: 'Predefined expense descriptions',
-  },
 ];
 
 export default function SettingsScreen() {

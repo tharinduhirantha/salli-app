@@ -3,7 +3,6 @@
   "version": "1.0.0",
   "main": "index.ts",
   "scripts": {
-    "test": "jest",
     "start": "expo start",
     "android": "expo start --android",
     "ios": "expo start --ios",
@@ -40,12 +39,7 @@
     "react-native-worklets": "0.5.1"
   },
   "devDependencies": {
-    "@testing-library/jest-native": "^5.4.3",
-    "@testing-library/react-native": "^13.3.3",
-    "@types/jest": "^30.0.0",
     "@types/react": "~19.1.0",
-    "jest": "^30.3.0",
-    "jest-expo": "^55.0.17",
     "playwright": "^1.59.1",
     "typescript": "~5.9.2",
     "xlsx": "^0.18.5"
