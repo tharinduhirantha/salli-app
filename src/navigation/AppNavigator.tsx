@@ -205,9 +205,10 @@ export default function AppNavigator() {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, newSession) => {
       if (_event === 'PASSWORD_RECOVERY') {
         setIsRecovery(true);
+        setSession(newSession);
         return;
       }
-      if (_event === 'SIGNED_OUT') {
+      if (_event === 'USER_UPDATED' || _event === 'SIGNED_OUT') {
         setIsRecovery(false);
       }
       setSession(newSession);
@@ -235,7 +236,7 @@ export default function AppNavigator() {
             </HouseProvider>
           </UserProvider>
         ) : (
-          <AuthScreen initialStep={isRecovery ? 'reset' : 'signin'} />
+          <AuthScreen key={isRecovery ? 'recovery' : 'normal'} initialStep={isRecovery ? 'reset' : 'signin'} />
         )}
       </AlertProvider>
     </NavigationContainer>

@@ -110,8 +110,14 @@ export default function AuthScreen({ initialStep = 'signin' }: { initialStep?: S
 
   const handleForgot = async () => {
     if (!email.trim()) { showAlert('Required', 'Enter your email address.'); return; }
+    const redirectTo = Platform.OS === 'web' && typeof window !== 'undefined'
+      ? window.location.origin
+      : undefined;
     setLoading(true);
-    const { error } = await supabase.auth.resetPasswordForEmail(email.trim().toLowerCase());
+    const { error } = await supabase.auth.resetPasswordForEmail(
+      email.trim().toLowerCase(),
+      redirectTo ? { redirectTo } : undefined,
+    );
     setLoading(false);
     if (error) { showAlert('Error', error.message); return; }
     setResetSent(true);
@@ -125,7 +131,7 @@ export default function AuthScreen({ initialStep = 'signin' }: { initialStep?: S
     const { error } = await supabase.auth.updateUser({ password });
     setLoading(false);
     if (error) { showAlert('Error', error.message); return; }
-    await supabase.auth.signOut();
+    // USER_UPDATED event fires → AppNavigator clears isRecovery → auto-logs user in
   };
 
   return (
