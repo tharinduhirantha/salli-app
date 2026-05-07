@@ -185,6 +185,7 @@ function AppContent() {
 export default function AppNavigator() {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isRecovery, setIsRecovery] = useState(false);
 
   const verifySession = useCallback(async () => {
     const { data: { user }, error } = await supabase.auth.getUser();
@@ -202,6 +203,13 @@ export default function AppNavigator() {
     verifySession();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, newSession) => {
+      if (_event === 'PASSWORD_RECOVERY') {
+        setIsRecovery(true);
+        return;
+      }
+      if (_event === 'SIGNED_OUT') {
+        setIsRecovery(false);
+      }
       setSession(newSession);
     });
 
@@ -220,14 +228,14 @@ export default function AppNavigator() {
   return (
     <NavigationContainer ref={navigationRef}>
       <AlertProvider>
-        {session ? (
+        {session && !isRecovery ? (
           <UserProvider>
             <HouseProvider>
               <AppContent />
             </HouseProvider>
           </UserProvider>
         ) : (
-          <AuthScreen />
+          <AuthScreen initialStep={isRecovery ? 'reset' : 'signin'} />
         )}
       </AlertProvider>
     </NavigationContainer>

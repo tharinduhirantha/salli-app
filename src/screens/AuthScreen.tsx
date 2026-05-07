@@ -15,11 +15,11 @@ const { width, height } = Dimensions.get('window');
 // Set to true to re-enable email OTP verification on signup
 const EMAIL_VERIFICATION_ENABLED = true;
 
-type Step = 'signin' | 'signup' | 'verify';
+type Step = 'signin' | 'signup' | 'verify' | 'forgot' | 'reset';
 
-export default function AuthScreen() {
+export default function AuthScreen({ initialStep = 'signin' }: { initialStep?: Step }) {
   const { showAlert } = useAlert();
-  const [step, setStep]         = useState<Step>('signin');
+  const [step, setStep]         = useState<Step>(initialStep);
   const [email, setEmail]       = useState('');
   const [password, setPassword] = useState('');
   const [confirm, setConfirm]   = useState('');
@@ -29,6 +29,7 @@ export default function AuthScreen() {
   const [loading, setLoading]   = useState(false);
   const [showPass, setShowPass] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
+  const [resetSent, setResetSent] = useState(false);
 
   const [pendingEmail, setPendingEmail]       = useState('');
   const [pendingFullName, setPendingFullName] = useState('');
@@ -107,6 +108,26 @@ export default function AuthScreen() {
     else showAlert('Sent', 'A new code has been sent to your email.');
   };
 
+  const handleForgot = async () => {
+    if (!email.trim()) { showAlert('Required', 'Enter your email address.'); return; }
+    setLoading(true);
+    const { error } = await supabase.auth.resetPasswordForEmail(email.trim().toLowerCase());
+    setLoading(false);
+    if (error) { showAlert('Error', error.message); return; }
+    setResetSent(true);
+  };
+
+  const handleReset = async () => {
+    if (!password) { showAlert('Required', 'Enter a new password.'); return; }
+    if (password.length < 6) { showAlert('Too short', 'Password must be at least 6 characters.'); return; }
+    if (password !== confirm) { showAlert('Mismatch', 'Passwords do not match.'); return; }
+    setLoading(true);
+    const { error } = await supabase.auth.updateUser({ password });
+    setLoading(false);
+    if (error) { showAlert('Error', error.message); return; }
+    await supabase.auth.signOut();
+  };
+
   return (
     <View style={styles.root}>
       <KeyboardAvoidingView
@@ -140,6 +161,20 @@ export default function AuthScreen() {
                   <Text style={styles.subGreeting}>Enter the code we sent you</Text>
                 </>
               )}
+              {step === 'forgot' && (
+                <>
+                  <Text style={styles.greeting}>Reset password 🔑</Text>
+                  <Text style={styles.subGreeting}>
+                    {resetSent ? 'Check your inbox' : "We'll send you a reset link"}
+                  </Text>
+                </>
+              )}
+              {step === 'reset' && (
+                <>
+                  <Text style={styles.greeting}>New password 🔒</Text>
+                  <Text style={styles.subGreeting}>Choose a strong password</Text>
+                </>
+              )}
             </View>
             <View style={styles.illustration}>
               <Image source={require('../../assets/icon.png')} style={styles.illustrationImg} />
@@ -167,7 +202,7 @@ export default function AuthScreen() {
                   rightIcon={showPass ? 'eye-off-outline' : 'eye-outline'}
                   onRightIcon={() => setShowPass(p => !p)}
                 />
-                <TouchableOpacity style={styles.forgotRow}>
+                <TouchableOpacity style={styles.forgotRow} onPress={() => { setResetSent(false); setStep('forgot'); }}>
                   <Text style={styles.forgotText}>Forgot password?</Text>
                 </TouchableOpacity>
                 <PrimaryBtn label="Sign In" loading={loading} onPress={handleSignIn} />
@@ -260,6 +295,85 @@ export default function AuthScreen() {
                   <Text style={styles.switchText}>
                     Didn't receive it?{'  '}
                     <Text style={styles.switchLink}>Resend code</Text>
+                  </Text>
+                </TouchableOpacity>
+              </>
+            )}
+
+            {step === 'forgot' && (
+              <>
+                <TouchableOpacity style={styles.backRow} onPress={() => setStep('signin')}>
+                  <Ionicons name="arrow-back" size={18} color={Colors.navy} />
+                  <Text style={styles.backText}>Back to Sign In</Text>
+                </TouchableOpacity>
+
+                {resetSent ? (
+                  <>
+                    <View style={styles.sentBox}>
+                      <Ionicons name="mail-outline" size={28} color={Colors.success} />
+                      <Text style={styles.sentTitle}>Reset link sent!</Text>
+                      <Text style={styles.sentDesc}>
+                        Check your inbox at{'\n'}
+                        <Text style={styles.verifyEmail}>{email.trim().toLowerCase()}</Text>
+                        {'\n\n'}Click the link in the email to set a new password.
+                      </Text>
+                    </View>
+                    <TouchableOpacity style={styles.switchRow} onPress={() => { setResetSent(false); setLoading(false); handleForgot(); }}>
+                      <Text style={styles.switchText}>
+                        Didn't receive it?{'  '}
+                        <Text style={styles.switchLink}>Resend</Text>
+                      </Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={[styles.switchRow, { marginTop: 8 }]} onPress={() => setStep('signin')}>
+                      <Text style={[styles.switchLink, { fontSize: 14 }]}>Back to Sign In</Text>
+                    </TouchableOpacity>
+                  </>
+                ) : (
+                  <>
+                    <Text style={styles.verifyDesc}>
+                      Enter the email address for your account and we'll send you a password reset link.
+                    </Text>
+                    <IconField
+                      icon="mail-outline"
+                      value={email}
+                      onChangeText={setEmail}
+                      placeholder="Email address"
+                      keyboardType="email-address"
+                      autoCapitalize="none"
+                    />
+                    <PrimaryBtn label="Send Reset Link" loading={loading} onPress={handleForgot} />
+                  </>
+                )}
+              </>
+            )}
+
+            {step === 'reset' && (
+              <>
+                <Text style={styles.verifyDesc}>
+                  Enter a new password for your account.
+                </Text>
+                <IconField
+                  icon="lock-closed-outline"
+                  value={password}
+                  onChangeText={setPassword}
+                  placeholder="New password (min. 6 characters)"
+                  secureTextEntry={!showPass}
+                  rightIcon={showPass ? 'eye-off-outline' : 'eye-outline'}
+                  onRightIcon={() => setShowPass(p => !p)}
+                />
+                <IconField
+                  icon="shield-checkmark-outline"
+                  value={confirm}
+                  onChangeText={setConfirm}
+                  placeholder="Confirm new password"
+                  secureTextEntry={!showConfirm}
+                  rightIcon={showConfirm ? 'eye-off-outline' : 'eye-outline'}
+                  onRightIcon={() => setShowConfirm(p => !p)}
+                />
+                <PrimaryBtn label="Set New Password" loading={loading} onPress={handleReset} />
+                <TouchableOpacity style={[styles.switchRow, { marginTop: 12 }]} onPress={() => supabase.auth.signOut()}>
+                  <Text style={styles.switchText}>
+                    <Text style={styles.switchLink}>Cancel</Text>
                   </Text>
                 </TouchableOpacity>
               </>
@@ -376,6 +490,9 @@ const styles = StyleSheet.create({
 
   verifyDesc:  { fontSize: 14, color: Colors.textSecondary, lineHeight: 22, marginBottom: 16 },
   verifyEmail: { fontWeight: '700', color: Colors.navy },
+  sentBox:     { alignItems: 'center', paddingVertical: 20, gap: 10 },
+  sentTitle:   { fontSize: 18, fontWeight: '800', color: Colors.navy },
+  sentDesc:    { fontSize: 14, color: Colors.textSecondary, lineHeight: 22, textAlign: 'center' },
 
   tagline: {
     textAlign: 'center',
