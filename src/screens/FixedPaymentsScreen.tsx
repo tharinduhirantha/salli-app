@@ -486,7 +486,7 @@ function PaymentModal({
         <MLabel text="Name" />
         <TextInput style={styles.mInput} value={name} onChangeText={setName} placeholder="e.g. House Mortgage" placeholderTextColor={Colors.textMuted} />
 
-        <MLabel text="Merchant (optional)" />
+        <MLabel text="Merchant / Expense (optional)" />
         <TouchableOpacity
           style={[styles.merchantSelector, { borderColor: merchantExpanded ? Colors.primary : Colors.border }]}
           onPress={() => { setMerchantExpanded(e => !e); setMerchantSearch(''); }}
@@ -539,7 +539,7 @@ function PaymentModal({
                 ))}
               {merchants.filter(m => !merchantSearch || m.name.toLowerCase().includes(merchantSearch.toLowerCase())).length === 0 && (
                 <View style={[styles.merchantDropRow, { justifyContent: 'center' }]}>
-                  <Text style={{ fontSize: 13, color: Colors.textMuted }}>No merchants found</Text>
+                  <Text style={{ fontSize: 13, color: Colors.textMuted }}>No merchants / expenses found</Text>
                 </View>
               )}
             </View>

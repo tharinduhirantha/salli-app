@@ -321,7 +321,8 @@ export default function AuthScreen({ initialStep = 'signin' }: { initialStep?: S
                       <Text style={styles.sentDesc}>
                         Check your inbox at{'\n'}
                         <Text style={styles.verifyEmail}>{email.trim().toLowerCase()}</Text>
-                        {'\n\n'}Click the link in the email to set a new password.
+                        {'\n\n'}Click the link in the email to set a new password.{'\n\n'}
+                        Can't find it? Check your spam or junk folder.
                       </Text>
                     </View>
                     <TouchableOpacity style={styles.switchRow} onPress={() => { setResetSent(false); setLoading(false); handleForgot(); }}>

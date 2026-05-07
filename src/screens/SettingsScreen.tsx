@@ -33,7 +33,7 @@ const MENU_ITEMS = [
     screen: 'Merchants',
     icon: 'storefront-outline' as const,
     color: Colors.navy,
-    title: 'Merchants',
+    title: 'Merchant / Expense',
     desc: 'Manage your house merchants',
   },
 ];

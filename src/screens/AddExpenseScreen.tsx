@@ -212,8 +212,8 @@ export default function AddExpenseScreen() {
           </View>
         </View>
 
-        {/* Merchant (optional) */}
-        <Label text="Merchant (optional)" />
+        {/* Merchant / Expense (optional) */}
+        <Label text="Merchant / Expense (optional)" />
         <TouchableOpacity
           style={[styles.catSelector, { borderColor: merchantExpanded ? Colors.primary : Colors.border }]}
           onPress={() => { setMerchantExpanded(e => !e); setMerchantSearch(''); }}
@@ -221,7 +221,7 @@ export default function AddExpenseScreen() {
         >
           <Ionicons name="storefront-outline" size={15} color={merchant ? Colors.primary : Colors.textMuted} />
           <Text style={[styles.catSelectorText, { color: merchant ? Colors.textPrimary : Colors.textMuted }]} numberOfLines={1}>
-            {merchant || 'Select merchant…'}
+            {merchant || 'Select merchant / expense…'}
           </Text>
           {merchant ? (
             <TouchableOpacity onPress={() => { setMerchant(''); setMerchantExpanded(false); }}>
@@ -255,7 +255,7 @@ export default function AddExpenseScreen() {
                 <ScrollView style={styles.merchantScroll} nestedScrollEnabled keyboardShouldPersistTaps="handled">
                   {filtered.length === 0 ? (
                     <View style={[styles.catDropRow, { justifyContent: 'center' }]}>
-                      <Text style={{ fontSize: 13, color: Colors.textMuted }}>No merchants found</Text>
+                      <Text style={{ fontSize: 13, color: Colors.textMuted }}>No merchants / expenses found</Text>
                     </View>
                   ) : filtered.map(m => (
                     <TouchableOpacity

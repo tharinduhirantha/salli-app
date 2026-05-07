@@ -65,7 +65,7 @@ export default function SettingsMerchantsScreen() {
 
         {/* Fixed add section */}
         <View style={s.addSection}>
-          <Text style={s.addLabel}>Add new merchant</Text>
+          <Text style={s.addLabel}>Add new merchant / expense</Text>
           <View style={[s.addRow, focused && s.addRowFocused]}>
             <Ionicons name="storefront-outline" size={18} color={focused ? Colors.primary : Colors.textMuted} style={{ marginLeft: 14 }} />
             <TextInput
@@ -94,7 +94,7 @@ export default function SettingsMerchantsScreen() {
             activeOpacity={0.8}
           >
             <Ionicons name="add-circle-outline" size={18} color="#fff" />
-            <Text style={s.addBtnText}>{saving ? 'Saving…' : 'Add Merchant'}</Text>
+            <Text style={s.addBtnText}>{saving ? 'Saving…' : 'Add Merchant / Expense'}</Text>
           </TouchableOpacity>
         </View>
 
@@ -102,7 +102,7 @@ export default function SettingsMerchantsScreen() {
         <ScrollView contentContainerStyle={s.content} keyboardShouldPersistTaps="handled">
           {merchants.length > 0 && (
             <View style={s.listHeader}>
-              <Text style={s.listTitle}>Your Merchants</Text>
+              <Text style={s.listTitle}>Your Merchants / Expenses</Text>
               <View style={s.countBadge}>
                 <Text style={s.countText}>{merchants.length}</Text>
               </View>
@@ -114,8 +114,8 @@ export default function SettingsMerchantsScreen() {
               <View style={s.emptyIcon}>
                 <Ionicons name="storefront-outline" size={32} color={Colors.primary} />
               </View>
-              <Text style={s.emptyTitle}>No merchants yet</Text>
-              <Text style={s.emptyHint}>Add merchants above to quickly tag{'\n'}where your money is spent</Text>
+              <Text style={s.emptyTitle}>No merchants / expenses yet</Text>
+              <Text style={s.emptyHint}>Add merchants or expense names above{'\n'}to quickly tag your transactions</Text>
             </View>
           ) : (
             <View style={s.listCard}>
