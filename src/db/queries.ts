@@ -563,6 +563,35 @@ export async function deleteMerchant(id: string): Promise<void> {
   if (error) throw new Error(error.message);
 }
 
+// ─── Expense Names ───────────────────────────────────────────────────────────
+
+export interface ExpenseName {
+  id: string;
+  name: string;
+}
+
+export async function getExpenseNames(houseId: string): Promise<ExpenseName[]> {
+  const { data, error } = await supabase
+    .from('expense_names')
+    .select('id, name')
+    .eq('house_id', houseId)
+    .order('name', { ascending: true });
+  if (error) throw new Error(error.message);
+  return (data ?? []).map((r: any) => ({ id: r.id, name: r.name }));
+}
+
+export async function addExpenseName(houseId: string, name: string): Promise<void> {
+  const { error } = await supabase
+    .from('expense_names')
+    .insert({ house_id: houseId, name: name.trim() });
+  if (error) throw new Error(error.message);
+}
+
+export async function deleteExpenseName(id: string): Promise<void> {
+  const { error } = await supabase.from('expense_names').delete().eq('id', id);
+  if (error) throw new Error(error.message);
+}
+
 // ─── Transactions ────────────────────────────────────────────────────────────
 
 export async function getTransactions(month: string, houseId: string): Promise<Transaction[]> {
