@@ -697,15 +697,17 @@ export async function getDueRecurringPayments(
     .filter(p => p.userOwes.some(u => !u.isPaid));
 }
 
-export async function getDueTransactions(month: string, houseId: string): Promise<DuePayment[]> {
+export async function getDueTransactions(month: string, houseId: string, personalOnly?: boolean): Promise<DuePayment[]> {
+  let query = supabase
+    .from('transactions')
+    .select('id, description, date, category, amount, payment_method, owner, status')
+    .eq('month', month)
+    .eq('house_id', houseId)
+    .eq('status', 'NP');
+  if (personalOnly === true)  query = query.eq('category', 'Personal');
+  if (personalOnly === false) query = query.neq('category', 'Personal');
   const [{ data, error }, members] = await Promise.all([
-    supabase
-      .from('transactions')
-      .select('id, description, date, category, amount, payment_method, owner, status')
-      .eq('month', month)
-      .eq('house_id', houseId)
-      .eq('status', 'NP')
-      .order('date', { ascending: false }),
+    query.order('date', { ascending: false }),
     getHouseMembers(houseId),
   ]);
   if (error) throw new Error(error.message);

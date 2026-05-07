@@ -36,23 +36,26 @@ export default function StatusScreen() {
   const [pmTotals, setPmTotals] = useState<PaymentMethodTotals>({
     Cash: { total: 0, due: 0 }, Card: { total: 0, due: 0 }, Account: { total: 0, due: 0 },
   });
-  const [dueRec, setDueRec] = useState<DuePayment[]>([]);
-  const [dueTx, setDueTx]   = useState<DuePayment[]>([]);
+  const [dueRec, setDueRec]     = useState<DuePayment[]>([]);
+  const [dueExpTx, setDueExpTx] = useState<DuePayment[]>([]);
+  const [duePerTx, setDuePerTx] = useState<DuePayment[]>([]);
   const [loading, setLoading]   = useState(true);
 
   const load = useCallback(async () => {
     if (!currentHouse) return;
     setLoading(true);
-    const [sum, pm, rec, tx] = await Promise.all([
+    const [sum, pm, rec, expTx, perTx] = await Promise.all([
       getPersonalHouseSummary(month, currentHouse.id),
       getPaymentMethodTotals(month, currentHouse.id),
       getDueRecurringPayments(month, currentHouse.id),
-      getDueTransactions(month, currentHouse.id),
+      getDueTransactions(month, currentHouse.id, false),
+      getDueTransactions(month, currentHouse.id, true),
     ]);
     setSummary(sum);
     setPmTotals(pm);
     setDueRec(rec);
-    setDueTx(tx);
+    setDueExpTx(expTx);
+    setDuePerTx(perTx);
     setLoading(false);
   }, [month, currentHouse]);
 
@@ -90,7 +93,8 @@ export default function StatusScreen() {
           <SettlementCard
             totals={pmTotals}
             dueRecurring={dueRec}
-            duePersonal={dueTx}
+            dueExpenses={dueExpTx}
+            duePersonal={duePerTx}
             onMarkUserPaid={async (id, user, source) => {
               if (source === 'transaction') await markTransactionPaid(id);
               else await markRecurringUserPaid(id, user);
@@ -148,20 +152,22 @@ const PM_CONFIG: { key: string; label: string; icon: string; color: string }[] =
   { key: 'Cash',    label: 'Cash',    icon: 'cash-outline',   color: Colors.success },
 ];
 
-function SettlementCard({ totals, dueRecurring, duePersonal, onMarkUserPaid }: {
+function SettlementCard({ totals, dueRecurring, dueExpenses, duePersonal, onMarkUserPaid }: {
   totals: PaymentMethodTotals;
   dueRecurring: DuePayment[];
+  dueExpenses: DuePayment[];
   duePersonal: DuePayment[];
   onMarkUserPaid: (id: string, user: string, source: DuePayment['source']) => Promise<void>;
 }) {
-  const grandTotal = dueRecurring.reduce((s, p) => s + p.totalOwed, 0)
+  const allDue = [...dueRecurring, ...dueExpenses];
+  const grandTotal = allDue.reduce((s, p) => s + p.totalOwed, 0)
                    + duePersonal.reduce((s, p) => s + p.totalOwed, 0);
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
   const toggle = (key: string) => setCollapsed(prev => ({ ...prev, [key]: !prev[key] }));
 
-  // Group by payment method → user → { rec, per }
+  // Group by payment method → user → { rec (recurring+expenses), per (personal only) }
   const pmGroups = PM_CONFIG.map(pm => {
-    const rec = dueRecurring.filter(p => p.paymentMethod === pm.key);
+    const rec = allDue.filter(p => p.paymentMethod === pm.key);
     const per = duePersonal.filter(p => p.paymentMethod === pm.key);
 
     // Collect unique users by nickname (consistent across both sources)
