@@ -215,7 +215,13 @@ export default function AppNavigator() {
     });
 
     const appStateSub = AppState.addEventListener('change', nextState => {
-      if (nextState === 'active') verifySession();
+      if (nextState === 'active') {
+        // Use local session check only — avoids false logouts from network errors.
+        // autoRefreshToken + onAuthStateChange handle token renewal automatically.
+        supabase.auth.getSession().then(({ data: { session: s } }) => {
+          if (!s) setSession(null);
+        });
+      }
     });
 
     return () => {
