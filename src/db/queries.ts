@@ -731,6 +731,35 @@ export async function getDueTransactions(month: string, houseId: string, persona
   }));
 }
 
+export async function copyRecurringPayments(
+  fromMonth: string,
+  toMonth: string,
+  houseId: string,
+): Promise<number> {
+  const payments = await getRecurringPayments(fromMonth, houseId);
+  if (payments.length === 0) return 0;
+  let count = 0;
+  for (const p of payments) {
+    await addRecurringPayment({
+      name: p.name,
+      merchant: p.merchant,
+      dueDate: p.dueDate,
+      type: p.type,
+      amount: p.amount,
+      month: toMonth,
+      paymentMethod: p.paymentMethod,
+      userShares: p.userShares.map(s => ({
+        userId: s.userId,
+        pay: s.pay,
+        paid: 0,
+        isPaid: false,
+      })),
+    }, houseId);
+    count++;
+  }
+  return count;
+}
+
 export async function markTransactionPaid(id: string): Promise<void> {
   const { error } = await supabase.from('transactions').update({ status: 'P' }).eq('id', id);
   if (error) throw new Error(error.message);

@@ -8,11 +8,12 @@ import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import {
   getRecurringPayments, addRecurringPayment, updateRecurringPayment,
-  deleteRecurringPayment, getHouseMembers, getMemberSplitPcts, getCategories, getMerchants, HouseMember, Category, Merchant,
+  deleteRecurringPayment, getHouseMembers, getMemberSplitPcts, getCategories, getMerchants,
+  copyRecurringPayments, HouseMember, Category, Merchant,
 } from '../db/queries';
 import { useHouse } from '../context/HouseContext';
 import { RecurringPayment, PaymentMethod } from '../types';
-import { monthLabel, prevMonth as calcPrevMonth } from '../utils/date';
+import { monthLabel, prevMonth as calcPrevMonth, nextMonth as calcNextMonth } from '../utils/date';
 import { Colors, fmt } from '../utils/theme';
 import DatePickerInput from '../components/DatePickerInput';
 
@@ -70,6 +71,7 @@ export default function FixedPaymentsScreen() {
   const [prevMonthTotal, setPrevMonthTotal] = useState<number | null>(null);
   const [salaryEnabled, setSalaryEnabled] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
+  const [copyModalVisible, setCopyModalVisible] = useState(false);
   const [editing, setEditing] = useState<RecurringPayment | null>(null);
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
 
@@ -215,6 +217,10 @@ export default function FixedPaymentsScreen() {
           <View style={styles.empty}>
             <Ionicons name="card-outline" size={48} color={Colors.textMuted} />
             <Text style={styles.emptyText}>No recurring payments</Text>
+            <TouchableOpacity style={styles.copyFromBtn} onPress={() => setCopyModalVisible(true)}>
+              <Ionicons name="copy-outline" size={16} color={Colors.primary} />
+              <Text style={styles.copyFromBtnText}>Copy from another month</Text>
+            </TouchableOpacity>
           </View>
         }
         renderItem={({ item: [type, items] }) => {
@@ -303,10 +309,23 @@ export default function FixedPaymentsScreen() {
         }}
       />
 
+      {/* Copy FAB */}
+      <TouchableOpacity style={styles.fabCopy} onPress={() => setCopyModalVisible(true)}>
+        <Ionicons name="copy-outline" size={20} color={Colors.primary} />
+      </TouchableOpacity>
+
       {/* FAB */}
       <TouchableOpacity style={styles.fab} onPress={() => { setEditing(null); setModalVisible(true); }}>
         <Ionicons name="add" size={28} color="#fff" />
       </TouchableOpacity>
+
+      <CopyMonthModal
+        visible={copyModalVisible}
+        currentMonth={month}
+        houseId={currentHouse?.id ?? ''}
+        onClose={() => setCopyModalVisible(false)}
+        onCopied={() => { setCopyModalVisible(false); load(); }}
+      />
 
       <PaymentModal
         visible={modalVisible}
@@ -329,6 +348,86 @@ export default function FixedPaymentsScreen() {
       />
       </View>
     </View>
+  );
+}
+
+function CopyMonthModal({
+  visible, currentMonth, houseId, onClose, onCopied,
+}: {
+  visible: boolean; currentMonth: string; houseId: string;
+  onClose: () => void; onCopied: () => void;
+}) {
+  const { showAlert } = useAlert();
+  const [copying, setCopying] = useState(false);
+  const prevM = calcPrevMonth(currentMonth);
+  const nextM = calcNextMonth(currentMonth);
+
+  const confirmCopy = (fromMonth: string) => {
+    showAlert(
+      'Copy payments',
+      `Copy all recurring payments from ${monthLabel(fromMonth)} to ${monthLabel(currentMonth)}?\n\nPayment status will be reset to unpaid.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Copy', onPress: async () => {
+            setCopying(true);
+            try {
+              const count = await copyRecurringPayments(fromMonth, currentMonth, houseId);
+              if (count === 0) {
+                showAlert('Nothing to copy', `No recurring payments found in ${monthLabel(fromMonth)}.`);
+              } else {
+                showAlert('Done', `${count} payment${count !== 1 ? 's' : ''} copied from ${monthLabel(fromMonth)}.`);
+                onCopied();
+              }
+            } catch (e: any) {
+              showAlert('Error', e.message ?? 'Failed to copy payments.');
+            } finally {
+              setCopying(false);
+            }
+          },
+        },
+      ],
+    );
+  };
+
+  return (
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      <TouchableOpacity style={cm.overlay} activeOpacity={1} onPress={onClose}>
+        <TouchableOpacity activeOpacity={1} style={cm.sheet}>
+          <View style={cm.handle} />
+          <Text style={cm.title}>Copy from month</Text>
+          <Text style={cm.desc}>
+            Copy all recurring payments into {monthLabel(currentMonth)}. Payment status resets to unpaid.
+          </Text>
+
+          {([
+            { month: prevM, label: 'Previous Month', icon: 'arrow-back-circle-outline' as const, color: Colors.primary },
+            { month: nextM, label: 'Next Month',     icon: 'arrow-forward-circle-outline' as const, color: Colors.ma },
+          ]).map(opt => (
+            <TouchableOpacity
+              key={opt.month}
+              style={cm.option}
+              onPress={() => { onClose(); confirmCopy(opt.month); }}
+              disabled={copying}
+              activeOpacity={0.75}
+            >
+              <View style={[cm.optIcon, { backgroundColor: opt.color + '18' }]}>
+                <Ionicons name={opt.icon} size={22} color={opt.color} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={cm.optLabel}>{opt.label}</Text>
+                <Text style={[cm.optMonth, { color: opt.color }]}>{monthLabel(opt.month)}</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color={Colors.textMuted} />
+            </TouchableOpacity>
+          ))}
+
+          <TouchableOpacity style={cm.cancelBtn} onPress={onClose}>
+            <Text style={cm.cancelText}>Cancel</Text>
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </TouchableOpacity>
+    </Modal>
   );
 }
 
@@ -795,6 +894,8 @@ const styles = StyleSheet.create({
   summaryUserUnpaid:    { fontSize: 10, fontWeight: '600' },
   empty: { alignItems: 'center', paddingTop: 80 },
   emptyText: { fontSize: 16, color: Colors.textSecondary, marginTop: 12, marginBottom: 16 },
+  copyFromBtn: { flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 1.5, borderColor: Colors.primary, borderRadius: 14, paddingHorizontal: 18, paddingVertical: 12, marginTop: 4 },
+  copyFromBtnText: { fontSize: 14, fontWeight: '700', color: Colors.primary },
   group: { marginBottom: 12, backgroundColor: Colors.card, borderRadius: 16, overflow: 'hidden', shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 8, elevation: 2 },
   groupHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 20, borderLeftWidth: 4, backgroundColor: '#F8FAFC' },
   groupHeaderLeft: { flexDirection: 'row', alignItems: 'center', gap: 8 },
@@ -816,7 +917,8 @@ const styles = StyleSheet.create({
   paidByLabel: { fontSize: 11, fontWeight: '600', color: Colors.textMuted, marginRight: 2 },
   paidBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 6 },
   paidText: { fontSize: 12, fontWeight: '700' },
-  fab: { position: 'absolute', bottom: 24, right: 24, width: 56, height: 56, borderRadius: 28, backgroundColor: Colors.primary, justifyContent: 'center', alignItems: 'center', shadowColor: Colors.primary, shadowOpacity: 0.4, shadowRadius: 12, elevation: 8 },
+  fab:     { position: 'absolute', bottom: 24, right: 24, width: 56, height: 56, borderRadius: 28, backgroundColor: Colors.primary, justifyContent: 'center', alignItems: 'center', shadowColor: Colors.primary, shadowOpacity: 0.4, shadowRadius: 12, elevation: 8 },
+  fabCopy: { position: 'absolute', bottom: 90, right: 28, width: 44, height: 44, borderRadius: 22, backgroundColor: Colors.card, justifyContent: 'center', alignItems: 'center', shadowColor: '#000', shadowOpacity: 0.12, shadowRadius: 8, elevation: 5, borderWidth: 1.5, borderColor: Colors.primary },
   // Modal
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, borderBottomWidth: 1, borderBottomColor: Colors.border, backgroundColor: Colors.card },
   modalTitle: { fontSize: 16, fontWeight: '700', color: Colors.textPrimary },
@@ -871,4 +973,18 @@ const styles = StyleSheet.create({
   splitPayLabel: { fontSize: 11, fontWeight: '700', marginBottom: 6, textTransform: 'uppercase', letterSpacing: 0.5 },
   splitPayInput: { width: '100%', borderRadius: 8, borderWidth: 1.5, paddingHorizontal: 10, paddingVertical: 7, fontSize: 15, fontWeight: '700', color: Colors.textPrimary, textAlign: 'center', backgroundColor: 'transparent' },
   splitPayInputDisabled: { borderWidth: 0, color: Colors.textPrimary },
+});
+
+const cm = StyleSheet.create({
+  overlay:   { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end' },
+  sheet:     { backgroundColor: Colors.card, borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingHorizontal: 20, paddingBottom: 36, paddingTop: 12 },
+  handle:    { width: 40, height: 4, borderRadius: 2, backgroundColor: Colors.border, alignSelf: 'center', marginBottom: 20 },
+  title:     { fontSize: 18, fontWeight: '800', color: Colors.textPrimary, marginBottom: 6 },
+  desc:      { fontSize: 13, color: Colors.textMuted, lineHeight: 19, marginBottom: 20 },
+  option:    { flexDirection: 'row', alignItems: 'center', gap: 14, backgroundColor: Colors.bg, borderRadius: 16, padding: 16, marginBottom: 10, borderWidth: 1, borderColor: Colors.border },
+  optIcon:   { width: 44, height: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  optLabel:  { fontSize: 12, fontWeight: '600', color: Colors.textMuted, marginBottom: 2 },
+  optMonth:  { fontSize: 16, fontWeight: '800' },
+  cancelBtn: { alignItems: 'center', marginTop: 8, paddingVertical: 14 },
+  cancelText:{ fontSize: 15, fontWeight: '600', color: Colors.danger },
 });
