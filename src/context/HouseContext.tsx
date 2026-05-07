@@ -58,7 +58,8 @@ export function HouseProvider({ children }: { children: React.ReactNode }) {
   const goToNextMonth = useCallback(() => setMonth(m => nextMonth(m)), []);
 
   const refresh = useCallback(async () => {
-    const { data: { user } } = await supabase.auth.getUser();
+    const { data: { user }, error } = await supabase.auth.getUser();
+    if (error) { setIsLoading(false); return; }
     if (!user) { setUserHouses([]); setCurrentHouse(null); setPendingRequest(null); setIsLoading(false); return; }
 
     const { data } = await supabase
@@ -102,8 +103,11 @@ export function HouseProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     refresh();
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(() => {
-      refresh();
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      if (event === 'SIGNED_IN') refresh();
+      if (event === 'SIGNED_OUT') {
+        setUserHouses([]); setCurrentHouse(null); setPendingRequest(null); setIsLoading(false);
+      }
     });
     return () => subscription.unsubscribe();
   }, [refresh]);
