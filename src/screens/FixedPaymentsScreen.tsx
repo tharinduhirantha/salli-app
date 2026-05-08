@@ -468,6 +468,7 @@ function PaymentModal({
   const [paidAmounts, setPaidAmounts] = useState<string[]>([]);
   const [paidFlags,   setPaidFlags]   = useState<boolean[]>([]);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('Card');
+  const [isDue, setIsDue] = useState(false);
 
   useEffect(() => {
     if (payment) {
@@ -476,6 +477,8 @@ function PaymentModal({
       setDueDate(payment.dueDate);
       setType(payment.type);
       setAmount(String(payment.amount));
+      const due = payment.amount === 0;
+      setIsDue(due);
       const pays  = members.map(m => payment.userShares.find(s => s.userId === m.userId)?.pay  ?? 0);
       const paids = members.map(m => payment.userShares.find(s => s.userId === m.userId)?.paid ?? 0);
       const splitPcts = members.map(m => m.splitPct);
@@ -492,6 +495,7 @@ function PaymentModal({
       setPaidAmounts(members.map(() => ''));
       setPaidFlags(members.map(() => false));
       setPaymentMethod('Card');
+      setIsDue(false);
     }
   }, [payment, visible]);
 
@@ -525,30 +529,46 @@ function PaymentModal({
     if (splitMethod === 'Custom') setPayCustom(calcEvenPays(a, members.length || 1).map(String));
   };
 
+  const handleDueToggle = () => {
+    if (!isDue) {
+      setAmount('0');
+      setPaidAmounts(members.map(() => '0'));
+      setPaidFlags(members.map(() => false));
+      setIsDue(true);
+    } else {
+      setAmount('');
+      setIsDue(false);
+    }
+  };
+
   const handleSave = async () => {
-    if (!name.trim() || amt <= 0) { showAlert('Required', 'Name and amount are required.'); return; }
-    const splitTotal = Math.round(payValues.reduce((s, v) => s + v, 0) * 100) / 100;
-    if (Math.abs(splitTotal - amt) > 0.005) {
-      const parts = members.map((m, i) => `${m.nickname} ${fmt(payValues[i] ?? 0)}`).join(' + ');
-      showAlert('Invalid Split', `${parts} = ${fmt(splitTotal)}, but total is ${fmt(amt)}. Split must equal total.`);
-      return;
+    if (!name.trim()) { showAlert('Required', 'Name is required.'); return; }
+    if (!isDue && amt <= 0) { showAlert('Required', 'Amount is required.'); return; }
+    if (!isDue) {
+      const splitTotal = Math.round(payValues.reduce((s, v) => s + v, 0) * 100) / 100;
+      if (Math.abs(splitTotal - amt) > 0.005) {
+        const parts = members.map((m, i) => `${m.nickname} ${fmt(payValues[i] ?? 0)}`).join(' + ');
+        showAlert('Invalid Split', `${parts} = ${fmt(splitTotal)}, but total is ${fmt(amt)}. Split must equal total.`);
+        return;
+      }
+      const emptyIdx = members.findIndex((_, i) => (paidAmounts[i] ?? '').trim() === '');
+      if (emptyIdx !== -1) {
+        showAlert('Required', `Paid amount for ${members[emptyIdx].nickname} is required. Enter 0 if unpaid.`);
+        return;
+      }
+      const rawVals = members.map((_, i) => parseFloat(paidAmounts[i]!) || 0);
+      const paidTotal = Math.round(rawVals.reduce((s, v) => s + v, 0) * 100) / 100;
+      if (Math.abs(paidTotal - amt) > 0.005) {
+        const parts = members.map((m, i) => `${m.nickname} ${fmt(rawVals[i] ?? 0)}`).join(' + ');
+        showAlert('Invalid Paid Amount', `${parts} = ${fmt(paidTotal)}, but total is ${fmt(amt)}. Paid amounts must equal the total.`);
+        return;
+      }
     }
-    const emptyIdx = members.findIndex((_, i) => (paidAmounts[i] ?? '').trim() === '');
-    if (emptyIdx !== -1) {
-      showAlert('Required', `Paid amount for ${members[emptyIdx].nickname} is required. Enter 0 if unpaid.`);
-      return;
-    }
-    const rawVals = members.map((_, i) => parseFloat(paidAmounts[i]!) || 0);
-    const paidTotal = Math.round(rawVals.reduce((s, v) => s + v, 0) * 100) / 100;
-    if (Math.abs(paidTotal - amt) > 0.005) {
-      const parts = members.map((m, i) => `${m.nickname} ${fmt(rawVals[i] ?? 0)}`).join(' + ');
-      showAlert('Invalid Paid Amount', `${parts} = ${fmt(paidTotal)}, but total is ${fmt(amt)}. Paid amounts must equal the total.`);
-      return;
-    }
+    const finalPaid = isDue ? members.map(() => 0) : members.map((_, i) => parseFloat(paidAmounts[i]!) || 0);
     const p = {
       name: name.trim(), merchant: merchant.trim() || undefined,
       dueDate, type, amount: amt,
-      userShares: members.map((m, i) => ({ userId: m.userId, pay: payValues[i] ?? 0, paid: rawVals[i] ?? 0, isPaid: paidFlags[i] ?? false })),
+      userShares: members.map((m, i) => ({ userId: m.userId, pay: isDue ? 0 : (payValues[i] ?? 0), paid: finalPaid[i] ?? 0, isPaid: isDue ? false : (paidFlags[i] ?? false) })),
       month, paymentMethod,
     };
     try {
@@ -585,7 +605,17 @@ function PaymentModal({
         <MLabel text="Name" />
         <TextInput style={styles.mInput} value={name} onChangeText={setName} placeholder="e.g. House Mortgage" placeholderTextColor={Colors.textMuted} />
 
-        <MLabel text="Merchant / Expense (optional)" />
+        <View style={styles.merchantLabelRow}>
+          <Text style={[styles.mLabel, { marginTop: 0, marginBottom: 0 }]}>Merchant / Expense (optional)</Text>
+          <TouchableOpacity
+            style={[styles.dueFlag, isDue && styles.dueFlagActive]}
+            onPress={handleDueToggle}
+            activeOpacity={0.8}
+          >
+            <Ionicons name="flag" size={12} color={isDue ? '#fff' : Colors.danger} />
+            <Text style={[styles.dueFlagText, isDue && styles.dueFlagTextActive]}>Due</Text>
+          </TouchableOpacity>
+        </View>
         <TouchableOpacity
           style={[styles.merchantSelector, { borderColor: merchantExpanded ? Colors.primary : Colors.border }]}
           onPress={() => { setMerchantExpanded(e => !e); setMerchantSearch(''); }}
@@ -705,7 +735,7 @@ function PaymentModal({
         )}
 
         {/* Amount + Split Method */}
-        <View style={styles.inlineRow}>
+        <View style={[styles.inlineRow, isDue && { opacity: 0.45 }]}>
           <View style={[styles.inlineCol, { flex: 0.5 }]}>
             <MLabel text="Amount ($)" />
             <View style={{ position: 'relative' }}>
@@ -716,8 +746,9 @@ function PaymentModal({
                 keyboardType="decimal-pad"
                 placeholder="0.00"
                 placeholderTextColor={Colors.textMuted}
+                editable={!isDue}
               />
-              {!!amount && (
+              {!!amount && !isDue && (
                 <TouchableOpacity onPress={() => handleAmountChange('')} style={styles.clearIconBtn}>
                   <Ionicons name="close-circle" size={16} color={Colors.textMuted} />
                 </TouchableOpacity>
@@ -778,7 +809,9 @@ function PaymentModal({
 
         {/* Payment Status */}
         <MLabel text="Payment Status" />
-        <View style={styles.payStatusCard}>
+        <View style={[styles.payStatusCard, isDue && { opacity: 0.45 }]}
+          pointerEvents={isDue ? 'none' : 'auto'}
+        >
           {members.map((m, i) => {
             const paidAmt = paidAmounts[i] ?? '';
             const isPaid  = paidFlags[i] ?? false;
@@ -929,6 +962,11 @@ const styles = StyleSheet.create({
   modalDeleteBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, borderWidth: 1.5, borderColor: Colors.danger, borderRadius: 14, paddingVertical: 14, marginTop: 12 },
   modalDeleteBtnText: { color: Colors.danger, fontSize: 15, fontWeight: '600' },
   mLabel: { fontSize: 12, fontWeight: '600', color: Colors.textSecondary, marginBottom: 6, marginTop: 16, textTransform: 'uppercase', letterSpacing: 0.5 },
+  merchantLabelRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 16, marginBottom: 6 },
+  dueFlag:         { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8, borderWidth: 1.5, borderColor: Colors.danger },
+  dueFlagActive:   { backgroundColor: Colors.danger },
+  dueFlagText:     { fontSize: 11, fontWeight: '700', color: Colors.danger, textTransform: 'uppercase', letterSpacing: 0.4 },
+  dueFlagTextActive: { color: '#fff' },
   payStatusCard:          { backgroundColor: Colors.card, borderRadius: 14, borderWidth: 1, borderColor: Colors.border, overflow: 'hidden', marginTop: 4 },
   payStatusDivider:       { height: StyleSheet.hairlineWidth, backgroundColor: Colors.border },
   payStatusBlock:         { paddingHorizontal: 14, paddingTop: 10, paddingBottom: 10, gap: 8 },
