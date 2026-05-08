@@ -740,21 +740,35 @@ export async function copyRecurringPayments(
   if (payments.length === 0) return 0;
   let count = 0;
   for (const p of payments) {
-    await addRecurringPayment({
-      name: p.name,
-      merchant: p.merchant,
-      dueDate: p.dueDate,
-      type: p.type,
-      amount: p.amount,
-      month: toMonth,
-      paymentMethod: p.paymentMethod,
-      userShares: p.userShares.map(s => ({
-        userId: s.userId,
-        pay: s.pay,
-        paid: 0,
-        isPaid: false,
-      })),
-    }, houseId);
+    const { data, error } = await supabase
+      .from('recurring_payments')
+      .insert({
+        name: p.name,
+        due_date: p.dueDate,
+        type: p.type,
+        amount: p.amount,
+        month: toMonth,
+        house_id: houseId,
+        payment_method: p.paymentMethod ?? 'Card',
+        ...(p.merchant ? { merchant: p.merchant } : {}),
+      })
+      .select('id')
+      .single();
+    if (error || !data) throw new Error(error?.message ?? 'Failed to copy payment');
+    if (p.userShares.length > 0) {
+      const { error: shareErr } = await supabase
+        .from('recurring_payment_shares')
+        .insert(
+          p.userShares.map(s => ({
+            payment_id: data.id,
+            user_id: s.userId,
+            pay: s.pay,
+            paid: 0,
+            is_paid: false,
+          }))
+        );
+      if (shareErr) throw new Error(shareErr.message);
+    }
     count++;
   }
   return count;
