@@ -273,19 +273,19 @@ export default function FixedPaymentsScreen() {
                       <Text style={styles.payName} numberOfLines={1}>{p.name}</Text>
                       <Text style={styles.payTotal}>{fmt(p.amount)}</Text>
                     </View>
-                    {/* Line 2: date + per-user pay chips */}
+                    {/* Line 2: date + per-user owns/paid */}
                     <View style={styles.payRowMid}>
                       <Text style={styles.payDate}>{p.dueDate}</Text>
                       <View style={styles.payShares}>
                         {membersWithSplit.map((m, i) => {
                           const color = USER_COLORS[i] ?? Colors.primary;
-                          const pay   = userPays[i] ?? 0;
+                          const pay  = userPays[i]  ?? 0;
+                          const paid = userPaid[i]  ?? 0;
                           return (
-                            <View key={m.nickname} style={[styles.payChip, { backgroundColor: color + '18' }]}>
-                              <View style={[styles.payChipAvatar, { backgroundColor: color }]}>
-                                <Text style={styles.payChipInitials}>{m.nickname.substring(0, 2).toUpperCase()}</Text>
-                              </View>
-                              <Text style={[styles.payChipAmt, { color }]}>{fmt(pay)}</Text>
+                            <View key={m.nickname} style={[styles.payUserBlock, { borderLeftColor: color }]}>
+                              <Text style={[styles.payUserName, { color }]}>{m.nickname}</Text>
+                              <Text style={styles.payUserLine}>Owns <Text style={{ fontWeight: '700', color }}>{fmt(pay)}</Text></Text>
+                              <Text style={styles.payUserLine}>Paid <Text style={{ fontWeight: '700', color: paid >= pay ? Colors.success : Colors.textMuted }}>{fmt(paid)}</Text></Text>
                             </View>
                           );
                         })}
@@ -951,11 +951,10 @@ const styles = StyleSheet.create({
   payName: { fontSize: 15, fontWeight: '700', color: Colors.textPrimary, flex: 1, marginRight: 12 },
   payDate: { fontSize: 12, color: Colors.textMuted },
   payTotal: { fontSize: 16, fontWeight: '800', color: Colors.textPrimary },
-  payShares:        { flexDirection: 'row', gap: 6 },
-  payChip:          { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 7, paddingVertical: 3, borderRadius: 8 },
-  payChipAvatar:    { width: 18, height: 18, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
-  payChipInitials:  { fontSize: 7, fontWeight: '800', color: '#fff' },
-  payChipAmt:       { fontSize: 12, fontWeight: '700' },
+  payShares:     { flexDirection: 'row', gap: 8 },
+  payUserBlock:  { borderLeftWidth: 2, paddingLeft: 7, gap: 1 },
+  payUserName:   { fontSize: 10, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.4 },
+  payUserLine:   { fontSize: 11, color: Colors.textMuted },
   paidRow: { flexDirection: 'row', gap: 6, justifyContent: 'flex-end', alignItems: 'center' },
   paidByLabel: { fontSize: 11, fontWeight: '600', color: Colors.textMuted, marginRight: 2 },
   paidBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 6 },
